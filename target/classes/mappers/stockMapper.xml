@@ -1,0 +1,4593 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ 
+ <mapper namespace="com.oldtom.smartstock.mapper.StockMapper">
+ 
+   	<!-- 종목 이름 -->
+	<select id="hnames" resultType="String">
+	select hname from smaster
+ 	</select>
+ 	
+  	<!-- 최근 거래일 -->
+	<select id="thedate" resultType="String">
+	select date from jonghap order by date desc limit #{day}, 1
+ 	</select>
+ 	
+ 	<!-- 종합주가지수 변동률 -->
+	<select id="kospi_rate" resultType="float">
+ 	<![CDATA[
+	select (b.close-a.close)/a.close*100 rate
+	from
+	(select * from jonghap where date=#{basedate}) a,
+	(select * from jonghap where date=#{targetdate}) b
+ 	]]>
+ 	</select>
+ 
+  	<!-- 최근 6개월 악재공시 -->
+	<select id="notice" resultType="NoticeVO">
+ 	<![CDATA[
+    select a.date, a.title, a.url from disclosure a
+    where a.shcode = #{shcode} and 
+        a.date between date_sub(#{basedate}, interval 180 day) and #{basedate} and
+        (title like '%유상증자%' or title like '%주식매수선택권%' or title like '%채무보증%' or title like '%풍문%'
+     	or title like '%채무인수%' or title like '%전환가액%' or title like '%주식담보%' or title like '%전환사채%'
+        or title like '%사채취득%' or title like '%증권발행%' or title like '%회사합병%' or title like '%회사분할%'
+        or title like '%단기차입금%' or title like '%시황변동%' or title like '%조회공시%' or title like '%지배구조%'
+        or title like '%금전대여%' or title like '%공급계약%' or title like '%신주인수권%' or title like '%교환가액%'
+        or title like '%불성실공시%' or title like '%매매거래정지%' or title like '%무상증자%' or title like '%자기주식%'
+        or title like '%최대주주%')
+	]]>
+ 	</select>
+ 	
+ 	
+ 	
+ 	<!-- 업종  -->	
+ 	<!-- N거래일동안 상승율이 큰 20업종 -->
+ 	<select id="upjong_rising_most_dayN" resultType="UpjongVO">
+	select b.date, a.upcode, a.upname, b.close, a.gubun, 
+		<choose>
+	  <when test="duration == 5">
+	   (b.close-b.close5)/b.close5*100 du_diff_rate 
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-b.close20)/b.close20*100 du_diff_rate 
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-b.close60)/b.close60*100 du_diff_rate
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-b.close120)/b.close120*100 du_diff_rate 
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-b.close250)/b.close250*100 du_diff_rate
+	  </when>
+	 </choose>
+	from upmaster a, updprice b
+	where a.upcode = b.upcode and b.date = #{basedate} 
+	<choose>
+	  <when test="gubun == '1'.toString()">
+	   <![CDATA[ and a.gubun = '1' and a.upcode > '004' and a.upcode < '100' ]]>
+	  </when>
+	  <when test="gubun == '2'.toString()">
+	   <![CDATA[ and a.gubun = '2' and a.upcode > '301' and a.upcode < '339' ]]>
+	  </when>
+	 </choose>
+	order by du_diff_rate desc
+
+ 	</select> 	
+
+	<!-- 업종별 종목 N거래일  주가 변동률 -->
+	<select id="rising_falling_dayN_by_upjong" resultType="StockVO">
+	select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+			a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+			(b.close-b.yclose)/b.yclose*100 diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   (c.close-c.close5)/c.close5*100 du_diff_rate 
+	  </when>
+	  <when test="duration == 20">
+	   (c.close-c.close20)/c.close20*100 du_diff_rate 
+	  </when>
+	  <when test="duration == 60">
+	   (c.close-c.close60)/c.close60*100 du_diff_rate
+	  </when>
+	  <when test="duration == 120">
+	   (c.close-c.close120)/c.close120*100 du_diff_rate 
+	  </when>
+	  <when test="duration == 250">
+	   (c.close-c.close250)/c.close250*100 du_diff_rate
+	  </when>
+	</choose>	
+	from
+	 (select * from ssummary where date = #{basedate}) a,
+	 (select * from dchart where date = #{basedate}) b,
+	 (select * from dprice where date = #{basedate}) c,
+	 (select * from upjong where upcode = #{upcode}) d
+	where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	order by du_diff_rate desc
+ 	</select> 	
+ 	
+ 	
+ 	 	
+ 	<!-- 요약 -->	 	
+ 	<!-- 5일선이 20일선 돌파 -->
+	<select id="ma520" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and sma5 > sma20 and ysma5 < ysma20 and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.sma5-a.sma20)/a.sma20 desc
+	limit 10
+ 	]]>
+ 	</select> 	
+
+ 	<!-- 20일선이 60일선 돌파 -->
+	<select id="ma2060" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and sma20 > sma60 and ysma20 < ysma60 and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.sma5-a.sma20)/a.sma20 desc
+	limit 10
+ 	]]>
+ 	</select> 	
+
+ 	<!-- 60일선이 120일선 돌파 -->
+	<select id="ma60120" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and sma60 > sma120 and ysma60 < ysma120 and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.sma5-a.sma20)/a.sma20 desc
+	limit 10
+ 	]]>
+ 	</select> 	
+
+ 	<!-- 10일 평균 대비 거래량이 200% 증가하고, 30만주 이상 거래된 종목 -->
+	<select id="volume" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and (volume-vma10)/vma10*100 > 200 and volume > 300000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.volume-a.vma20)/a.vma10 desc
+	limit 10
+ 	]]>
+ 	</select>
+ 	
+ 	<!-- 일목균형표 기준선 상향 돌파 -->
+	<select id="ilmok" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and ilmok9 > ilmok26 and yilmok9 < yilmok26 and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.ilmok9-a.ilmok26)/a.ilmok26 desc
+	limit 10
+ 	]]>
+ 	</select> 	 	
+ 	
+ 	<!-- slow K가 D 상향 돌파, D가 20% 상향 돌파 -->
+ 	<select id="slow" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and slowk > slowd and slowd > 20 
+	 	and yslowk < yslowd and yslowd <= 20 and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.slowk-a.slowd)/a.slowd desc
+	limit 10
+ 	]]>
+ 	</select>
+ 	
+ 	<!-- sonar 지표가 시그널선 상향 돌파 -->
+ 	<select id="sonar" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and sonar > sonarsig and ysonar < ysonarsig and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.sonar-a.sonarsig)/a.sonarsig desc
+	limit 10
+ 	]]>
+ 	</select> 
+ 	
+ 	<!-- MACD 지표가 시그널선 상향 돌파 -->
+ 	<select id="macd" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and macd > macdsig and ymacd < ymacdsig and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.macd-a.macdsig)/a.macdsig desc
+	limit 10
+ 	]]>
+ 	</select> 	 	  	 			 			
+
+	<!-- CGI 0선 상향 돌파 -->
+ 	<select id="cci" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and cci > 0 and ycci < 0 and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by a.cci desc
+	limit 10
+ 	]]>
+ 	</select> 	
+
+	<!-- RSI 지표가 시그널선 상향 돌파 -->
+ 	<select id="rsi" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, b.hname, a.close price, a.volume
+	from
+	(select * from dchart where date=#{basedate} and rsi > rsisig and yrsi < yrsisig and volume > 1000) a,
+	(select shcode, hname from smaster) b
+	where a.shcode=b.shcode
+	order by (a.rsi-a.rsisig)/a.rsisig desc
+	limit 10
+ 	]]>
+ 	</select> 	
+
+
+<!-- 오늘의 종목  -->
+ 	<!-- N거래일동안 상승율이 큰 100종목 -->
+ 	<select id="rising_most_dayN" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		(b.close-c.close)/c.close*100 rate1
+	from
+	 (select * from ssummary where date = #{basedate}) a,
+	 (select * from dchart where date = #{basedate}) b,
+	 (select * from dchart 
+	  where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) c
+	where a.shcode = b.shcode and b.shcode = c.shcode 
+	order by (b.close-c.close)/c.close desc
+	limit 100
+	]]>
+ 	</select>
+ 	 	
+ 	<!-- N거래일동안 하락율이 큰 100종목 -->
+ 	<select id="falling_most_dayN" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-c.close)/c.close*100 rate1
+	from
+	 (select * from ssummary where date = #{basedate}) a,
+	 (select * from dchart where date = #{basedate}) b,
+	 (select * from dchart 
+	  where date =  (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) c
+	where a.shcode = b.shcode and b.shcode = c.shcode 
+	order by (b.close-c.close)/c.close
+	limit 100
+	]]>
+ 	</select> 	
+
+ 	<!-- 시초가 갭 상승 종목 -->
+ 	<select id="gap_rising_moreM" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.open-b.yclose)/b.yclose*100 rate1
+	from
+	 (select * from ssummary where date = #{basedate}) a,
+	 (select * from dchart where date = #{basedate}) b
+	where a.shcode = b.shcode and (b.open-b.yclose)/b.yclose*100 >= #{rateM}
+ 	]]>
+ 	</select> 
+ 	
+ 	<!-- 시초가 갭 하락 종목 -->
+ 	<select id="gap_falling_moreM" resultType="StockVO">
+ 	<![CDATA[
+	select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.open-b.yclose)/b.yclose*100 rate1
+	from
+	 (select * from ssummary where date = #{basedate}) a,
+	 (select * from dchart where date = #{basedate}) b
+	where a.shcode = b.shcode and (b.yclose-b.open)/b.yclose*100 >= #{rateM}
+	]]>
+ 	</select> 
+
+
+ 	<!-- 250일, 500일 최고가/최저가 갱신 종목 -->
+ 	<select id="renew_low_high" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode 
+ 	]]>
+ 	
+ 	<if test="duration == 250">
+ 		<if test="sign == '1'.toString()">
+ 			and max250date = #{basedate}
+ 		</if>
+ 		<if test="sign == '2'.toString()">
+ 			and min250date = #{basedate}
+ 		</if>
+ 	</if>
+  	<if test="duration == 500">
+ 		<if test="sign == '1'.toString()">
+ 			and max500date = #{basedate}
+ 		</if>
+ 		<if test="sign == '2'.toString()">
+ 			and min500date = #{basedate}
+ 		</if>
+ 	</if>	 
+ 	</select> 
+
+ 
+  	<!-- 거래량이 전일대비 M%이상 급증한 종목 -->
+ 	<select id="volume_rising_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.volume-b.yvolume)/b.yvolume*100 rate1
+from
+ (select * from ssummary where date= #{basedate}) a,
+ (select * from dchart where date=#{basedate} ) b
+where a.shcode = b.shcode and b.volume > 100000 and (b.volume-b.yvolume)/b.yvolume*100 >= #{rateM}
+order by (b.volume-b.yvolume)/b.yvolume desc
+	]]>
+ 	</select>
+ 
+ 
+  	<!-- 거래량이 전일대비 M%이상 급감한 종목 -->
+ 	<select id="volume_falling_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.volume-b.yvolume)/b.yvolume*100 rate1
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate}) b
+where a.shcode = b.shcode and b.volume > 10000 and (b.yvolume-b.volume)/b.yvolume*100 >= #{rateM}
+order by (b.yvolume-b.volume)/b.yvolume desc
+	]]>
+ 	</select>
+ 	
+ 	
+ 	
+ <!-- 기본 분석  --> 	 	 
+ 	<!-- N거래일 M% 이상 상승한 종목 -->
+ 	<select id="rising_dayN_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-c.close)/c.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and (b.close-c.close)/c.close*100 >= #{rateM}
+	]]>
+ 	</select>
+ 	
+ 	<!-- N거래일 M% 이상 하락한 종목 -->
+ 	<select id="falling_dayN_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-c.close)/c.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and (c.close-b.close)/c.close*100 >= #{rateM}
+	]]>
+ 	</select>
+ 	
+    	
+ 	<!--  N개장일 주가변동이 +- M% 이상인 종목 -->
+ 	<select id="fluctuation_dayN_moreM" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   (min5-avg5)/avg5*100 rate1, (max5-avg5)/avg5*100 rate2 
+	  </when>
+	  <when test="duration == 10">
+	   (min10-avg10)/avg10*100 rate1, (max10-avg10)/avg10*100 rate2 
+	  </when>
+	  <when test="duration == 20">
+	   (min20-avg20)/avg20*100 rate1, (max20-avg20)/avg20*100 rate2 
+	  </when>
+	  <when test="duration == 30">
+	   (min30-avg30)/avg30*100 rate1, (max30-avg30)/avg30*100 rate2 
+	  </when>
+	  <when test="duration == 60">
+	   (min60-avg60)/avg60*100 rate1, (max60-avg60)/avg60*100 rate2 
+	  </when>
+	  <when test="duration == 90">
+	   (min90-avg90)/avg90*100 rate1, (max90-avg90)/avg90*100 rate2 
+	  </when>
+	  <when test="duration == 120">
+	   (min120-avg120)/avg120*100 rate1, (max120-avg120)/avg120*100 rate2 
+	  </when>
+	  <when test="duration == 150">
+	   (min150-avg150)/avg150*100 rate1, (max150-avg150)/avg150*100 rate2 
+	  </when>
+	  <when test="duration == 180">
+	   (min180-avg180)/avg180*100 rate1, (max180-avg180)/avg180*100 rate2 
+	  </when>
+	  <when test="duration == 250">
+	   (min250-avg250)/avg250*100 rate1, (max250-avg250)/avg250*100 rate2 
+	  </when>
+	  <when test="duration == 500">
+	   (min500-avg500)/avg500*100 rate1, (max500-avg500)/avg500*100 rate2 
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date= #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode 
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (avg5-min5)/avg5*100 >= #{rateM} and (max5-avg5)/avg5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (avg10-min10)/avg10*100 >= #{rateM} and (max10-avg10)/avg10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (avg20-min20)/avg20*100 >= #{rateM} and (max20-avg20)/avg20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (avg30-min30)/avg30*100 >= #{rateM} and (max30-avg30)/avg30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (avg60-min60)/avg60*100 >= #{rateM} and (max60-avg60)/avg60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (avg90-min90)/avg90*100 >= #{rateM} and (max90-avg90)/avg90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (avg120-min120)/avg120*100 >= #{rateM} and (max120-avg120)/avg120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (avg150-min150)/avg150*100 >= #{rateM} and (max150-avg150)/avg150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (avg180-min180)/avg180*100 >= #{rateM} and (max180-avg180)/avg180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (avg250-min250)/avg250*100 >= #{rateM} and (max250-avg250)/avg250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (avg500-min500)/avg500*100 >= #{rateM} and (max500-avg500)/avg500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select> 
+   	
+ 	<!--  N개장일 주가변동이 +- M% 이하인 종목 -->
+ 	<select id="fluctuation_dayN_lessM" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   (min5-avg5)/avg5*100 rate1, (max5-avg5)/avg5*100 rate2 
+	  </when>
+	  <when test="duration == 10">
+	   (min10-avg10)/avg10*100 rate1, (max10-avg10)/avg10*100 rate2 
+	  </when>
+	  <when test="duration == 20">
+	   (min20-avg20)/avg20*100 rate1, (max20-avg20)/avg20*100 rate2 
+	  </when>
+	  <when test="duration == 30">
+	   (min30-avg30)/avg30*100 rate1, (max30-avg30)/avg30*100 rate2 
+	  </when>
+	  <when test="duration == 60">
+	   (min60-avg60)/avg60*100 rate1, (max60-avg60)/avg60*100 rate2 
+	  </when>
+	  <when test="duration == 90">
+	   (min90-avg90)/avg90*100 rate1, (max90-avg90)/avg90*100 rate2 
+	  </when>
+	  <when test="duration == 120">
+	   (min120-avg120)/avg120*100 rate1, (max120-avg120)/avg120*100 rate2 
+	  </when>
+	  <when test="duration == 150">
+	   (min150-avg150)/avg150*100 rate1, (max150-avg150)/avg150*100 rate2 
+	  </when>
+	  <when test="duration == 180">
+	   (min180-avg180)/avg180*100 rate1, (max180-avg180)/avg180*100 rate2 
+	  </when>
+	  <when test="duration == 250">
+	   (min250-avg250)/avg250*100 rate1, (max250-avg250)/avg250*100 rate2 
+	  </when>
+	  <when test="duration == 500">
+	   (min500-avg500)/avg500*100 rate1, (max500-avg500)/avg500*100 rate2 
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and volume > 0) b,
+ (select * from dprice where date= #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode 
+
+		 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (avg5-min5)/avg5*100 <= #{rateM} and (max5-avg5)/avg5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (avg10-min10)/avg10*100 <= #{rateM} and (max10-avg10)/avg10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (avg20-min20)/avg20*100 <= #{rateM} and (max20-avg20)/avg20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (avg30-min30)/avg30*100 <= #{rateM} and (max30-avg30)/avg30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (avg30-min30)/avg30*100 <= #{rateM} and (max30-avg30)/avg30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (avg90-min90)/avg90*100 <= #{rateM} and (max90-avg90)/avg90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (avg120-min120)/avg120*100 <= #{rateM} and (max120-avg120)/avg120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (avg150-min150)/avg150*100 <= #{rateM} and (max150-avg150)/avg150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (avg180-min180)/avg180*100 <= #{rateM} and (max180-avg180)/avg180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (avg250-min250)/avg250*100 <= #{rateM} and (max250-avg250)/avg250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (avg500-min500)/avg500*100 <= #{rateM} and (max500-avg500)/avg500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select> 	
+ 
+
+ 	<!-- N거래일 연속상승 종목 -->
+ 	<select id="cont_rising_dayN" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(sign) cnt_sign from dstock 
+  where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1) 
+ and #{basedate} and diff > 0
+    group by shcode
+    having count(sign) = #{duration}) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select>
+ 	 		
+ 	<!-- N거래일 연속하락 종목 -->
+ 	<select id="cont_falling_dayN" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(sign) cnt_sign from dstock 
+  where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1) 
+  and #{basedate} and diff < 0
+  group by shcode
+  having count(sign) = #{duration}) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select>
+
+ 	
+ 	<!-- 전일대비 공매도  M% 이상 증가한 종목 -->
+ 	<select id="gongmaedo_rising_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (c.gmvolume-d.gmvolume)/d.gmvolume*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (select * from lender where date=#{basedate} and gmvolume >0 ) c,
+ (select * from lender 
+  where date=(select date from lender where date < #{basedate} order by date desc limit 1)) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode 
+ and (c.gmvolume-d.gmvolume)/d.gmvolume*100 >= #{rateM}
+	]]>
+ 	</select>
+	
+ 	
+ 	<!-- 전일대비 신용잔고가  M% 이상 증가한 종목 -->
+ 	<select id="sinyong_rising_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (c.sybalance -d.sybalance)/d.sybalance *100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (select * from lender where date=#{basedate} and sybalance >0 ) c,
+ (select * from lender 
+  where date=(select date from lender where date < #{basedate} order by date desc limit 1)) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode 
+ and (c.sybalance -d.sybalance)/d.sybalance*100 >= #{rateM}
+	]]>
+ 	</select>  	
+
+ 	 	 	 	
+ 	<!-- N이  M% 이상 보유한 종목 -->
+ 	<select id="holderN_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.rate rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from shareholder where holder=#{holder}) c
+where a.shcode = b.shcode and b.shcode = c.shcode  and rate >= #{rateM}
+	]]>
+ 	</select>
+ 	
+  	<!-- 외국/국내 기관투자가가 보유한 종목 -->
+ 	<select id="holderKK_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, sum(rate) rate1 from shareholder  
+  where holder = '국민연금' or holder like "%운용%" or holder like "%fe%" or holder like "%te%" 
+  or holder like "%sch" or holder like "%Rua%" or holder like "%red%" or holder like "%Pro%" 
+  or holder like "%pio%" or holder like "%삼성전자%" or holder like "%Laz%"or holder like "%her%" 
+  or holder like "%Him%" or holder like "%Gsy%" or holder like "first%" or holder like "%value%" 
+  or holder like "%Ass%"or holder like "%fi%" or holder like "%cap%" or holder like "%col%" 
+  or holder like "%invest%" or holder like "%black%" or holder like "%Morgan%"or holder like "%투자밸류%"
+  group by shcode)  c
+where a.shcode = b.shcode and b.shcode = c.shcode and h_rate >= #{rateM}
+	]]>
+ 	</select>	 
+	
+  	<!-- 최근 N개장일 외국인 지분율 M% 이상 증가한 종목 -->
+ 	<select id="foreign_rate_rising_dayN_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, a.f_rate rate1, a.f_rate-c.f_rate rate2
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from ssummary
+  where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+ ) c
+where a.shcode=b.shcode and b.shcode=c.shcode and a.f_rate-c.f_rate >= #{rateM}
+	]]>
+ 	</select>
+ 
+  	
+  	<!-- 최근 N개장일 외국인 지분율 M% 이상 하락한 종목 -->
+ 	<select id="foreign_rate_falling_dayN_lessM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, a.f_rate rate1, a.f_rate-c.f_rate rate2
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from ssummary
+  where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+ ) c
+where a.shcode=b.shcode and b.shcode=c.shcode and c.f_rate-a.f_rate >= #{rateM}
+	]]>
+ 	</select> 
+
+ 	 	
+ 	<!-- 최근 N개장일 연속 외국인 매수 종목 -->
+ 	<select id="foreign_cont_buying_dayN" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(fpvolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and fpvolume > 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select> 	
+  	
+ 	<!-- 최근 N개장일 연속 외국인 매도 종목 -->
+ 	<select id="foreign_cont_selling_dayN" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(fpvolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and fpvolume < 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select>
+ 	   	
+ 	<!-- 최근 N개장일 연속 기관매수 종목 -->
+ 	<select id="company_cont_buying_dayN" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(covolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and covolume > 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select> 
+ 	
+  	<!-- 최근 N개장일 연속 기관매도 종목 -->
+ 	<select id="company_cont_selling_dayN" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(covolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and covolume < 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select> 
+
+	<!-- 종목 조회 -->
+	<select id="view_stock" resultType="StockVO">
+ 	<![CDATA[
+select b.date, b.shcode, b.hname, b.per, b.pbr, b.roe, b.total, b.op_profit_rate_y ic_rate, b.f_rate, b.psr, b.sales, b.spc, b.dy_rate, b.notice,
+c.close price, c.volume, (c.close-c.yclose)/c.yclose*100 diff_rate, (c.volume-c.yvolume)/c.yvolume*100 vol_diff_rate,
+c.macd, c.sma5/c.sma20*100 sep_rate, 
+d.syrate sy_rate, d.gmper gm_rate,
+e.diff jong_diff_rate
+from
+ (select shcode from smaster where hname=#{hname}) a,
+ (select date, shcode, hname, per, pbr, roe, total, op_profit_rate_y, f_rate, psr, sales, spc, dy_rate, notice 
+  from ssummary 
+  where date between #{startdate} and #{basedate}) b,
+ (select date, shcode, close, volume, yclose, yvolume, macd, sma5, sma20 
+  from dchart 
+  where date between #{startdate} and #{basedate}) c,
+ (select date, shcode, syrate, gmper 
+  from lender 
+  where date between #{startdate} and #{basedate}) d,
+ (select date, diff 
+  from jonghap 
+  where date between #{startdate} and #{basedate}) e
+where
+ a.shcode=b.shcode and b.shcode=c.shcode and c.shcode=d.shcode
+ and b.date=c.date and c.date=d.date and d.date=e.date
+
+	]]>
+ 	</select> 
+
+
+
+
+
+
+
+
+
+ <!-- 재무 분석  --> 	 	 
+ 	<!-- 연 재무지표 기준 종목 -->
+ 	<select id="finance_year" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	op_profit, net_income, op_cash_flow, fcf, roa, capital_reserve_rate, per, pbr
+from
+ smaster a,
+ (select * from financey where date in (#{basedate}, #{basedate1}, #{basedate2}, #{basedate3})) b
+where a.shcode = b.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	]]>
+ 	</select>
+
+ 	<!-- 분기 재무지표 기준 종목 -->
+ 	<select id="finance_quarter" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	op_profit, net_income, op_cash_flow, fcf, roa, capital_reserve_rate, per, pbr
+from
+ smaster a,
+ (select * from financeq where date = #{basedate}) b
+where a.shcode = b.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	]]>
+ 	</select> 	 	
+
+ 	<!-- 전년대비 재무지표 개선 종목 -->
+ 	<select id="finance_year_improve1" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate}) b,
+ (select * from financey where date = date_sub(#{basedate},interval 1 year)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate1}) b,
+ (select * from financey where date = date_sub(#{basedate1},interval 1 year)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate2}) b,
+ (select * from financey where date = date_sub(#{basedate2},interval 1 year)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate3}) b,
+ (select * from financey where date = date_sub(#{basedate3},interval 1 year)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}	
+	]]>
+ 	</select>
+
+ 	<!-- 2년연속 재무지표 개선 종목 -->
+ 	<select id="finance_year_improve2" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate}) b,
+ (select * from financey where date = date_sub(#{basedate},interval 1 year)) c,
+  (select * from financey where date = date_sub(#{basedate},interval 2 year)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate1}) b,
+ (select * from financey where date = date_sub(#{basedate1},interval 1 year)) c,
+  (select * from financey where date = date_sub(#{basedate1},interval 2 year)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate2}) b,
+ (select * from financey where date = date_sub(#{basedate2},interval 1 year)) c,
+  (select * from financey where date = date_sub(#{basedate2},interval 2 year)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate3}) b,
+ (select * from financey where date = date_sub(#{basedate3},interval 1 year)) c,
+  (select * from financey where date = date_sub(#{basedate3},interval 2 year)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}	
+	]]>
+ 	</select>
+
+ 	<!-- 3년연속 재무지표 개선 종목 -->
+ 	<select id="finance_year_improve3" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate}) b,
+ (select * from financey where date = date_sub(#{basedate},interval 1 year)) c,
+ (select * from financey where date = date_sub(#{basedate},interval 2 year)) d,
+ (select * from financey where date = date_sub(#{basedate},interval 3 year)) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+	and (d.sales-e.sales)/e.sales*100 >= #{rate} and (d.op_profit_rate-e.op_profit_rate) >= #{rate1}
+	and (d.debt_rate-e.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate1}) b,
+ (select * from financey where date = date_sub(#{basedate1},interval 1 year)) c,
+ (select * from financey where date = date_sub(#{basedate1},interval 2 year)) d,
+ (select * from financey where date = date_sub(#{basedate1},interval 3 year)) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+	and (d.sales-e.sales)/e.sales*100 >= #{rate} and (d.op_profit_rate-e.op_profit_rate) >= #{rate1}
+	and (d.debt_rate-e.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate2}) b,
+ (select * from financey where date = date_sub(#{basedate2},interval 1 year)) c,
+ (select * from financey where date = date_sub(#{basedate2},interval 2 year)) d,
+ (select * from financey where date = date_sub(#{basedate2},interval 3 year)) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+	and (d.sales-e.sales)/e.sales*100 >= #{rate} and (d.op_profit_rate-e.op_profit_rate) >= #{rate1}
+	and (d.debt_rate-e.debt_rate) <= #{rate2}
+union
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financey where date = #{basedate3}) b,
+ (select * from financey where date = date_sub(#{basedate3},interval 1 year)) c,
+ (select * from financey where date = date_sub(#{basedate3},interval 2 year)) d,
+ (select * from financey where date = date_sub(#{basedate3},interval 3 year)) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+	and (d.sales-e.sales)/e.sales*100 >= #{rate} and (d.op_profit_rate-e.op_profit_rate) >= #{rate1}
+	and (d.debt_rate-e.debt_rate) <= #{rate2}	
+	]]>
+ 	</select>
+ 	
+ 	<!-- 전분기대비 재무지표 개선 종목 -->
+ 	<select id="finance_quarter_improve1" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financeq where date = #{basedate}) b,
+ (select * from financeq where date = date_sub(#{basedate},interval 3 month)) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	]]>
+ 	</select>
+
+ 	<!-- 2분기 연속 재무지표 개선 종목 -->
+ 	<select id="finance_quarter_improve2" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financeq where date = #{basedate}) b,
+ (select * from financeq where date = date_sub(#{basedate},interval 3 month)) c,
+ (select * from financeq where date = date_sub(#{basedate},interval 6 month)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+	]]>
+ 	</select>
+
+ 	<!-- 3분기 연속 재무지표 개선 종목 -->
+ 	<select id="finance_quarter_improve3" resultType="FinanceVO">
+ 	<![CDATA[
+select b.date, a.shcode, a.hname, b.sales, b.op_profit_rate, b.debt_rate, b.roe, b.cash_divided_yield_rate,
+	b.op_profit, b.net_income, b.op_cash_flow, b.fcf, b.roa, b.capital_reserve_rate, b.per, b.pbr
+from
+ smaster a,
+ (select * from financeq where date = #{basedate}) b,
+ (select * from financeq where date = date_sub(#{basedate},interval 3 month)) c,
+ (select * from financeq where date = date_sub(#{basedate},interval 6 month)) d,
+ (select * from financeq where date = date_sub(#{basedate},interval 9 month)) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	and b.sales>=#{sales} and b.op_profit_rate>=#{op_profit_rate}
+	and b.debt_rate<=#{debt_rate} and b.roe>=#{roe} and b.cash_divided_yield_rate>=#{cash_divided_yield_rate}
+	and (b.sales-c.sales)/c.sales*100 >= #{rate} and (b.op_profit_rate-c.op_profit_rate) >= #{rate1}
+	and (b.debt_rate-c.debt_rate) <= #{rate2}
+	and (c.sales-d.sales)/d.sales*100 >= #{rate} and (c.op_profit_rate-d.op_profit_rate) >= #{rate1}
+	and (c.debt_rate-d.debt_rate) <= #{rate2}
+	and (d.sales-e.sales)/e.sales*100 >= #{rate} and (d.op_profit_rate-e.op_profit_rate) >= #{rate1}
+	and (d.debt_rate-e.debt_rate) <= #{rate2}
+	]]>
+ 	</select>
+
+
+
+
+
+<!-- 이동평균선 분석 --> 
+  	
+  	<!-- 5일선이 20일선 상향돌파 종목 -->
+ 	<select id="ma5_20_upward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma5/sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 > sma20 and ysma5 < ysma20) b
+where a.shcode = b.shcode
+order by sma5/sma20 desc
+	]]>
+ 	</select>
+  	
+  	<!-- 5일선이 20일선 하향돌파 종목 -->
+ 	<select id="ma5_20_downward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma5/sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 < sma20 and ysma5 > ysma20) b
+where a.shcode = b.shcode
+order by sma5/sma20 
+	]]>
+ 	</select>
+
+  	<!-- 5일선이 20일선 상향돌파, 종가 M% 이상 상승 종목 -->
+ 	<select id="ma5_20_upward_rising_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma5/sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 > sma20 and ysma5 < ysma20 and (close-yclose)/yclose*100 >=#{rateM}) b
+where a.shcode = b.shcode
+order by sma5/sma20 desc
+	]]>
+ 	</select>
+  	
+  	<!-- 5일선이 20일선 하향돌파, 종가 M% 이상 하락 종목 -->
+ 	<select id="ma5_20_downward_falling_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma5/sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 < sma20 and ysma5 > ysma20 and (yclose-close)/yclose*100 >=#{rateM}) b
+where a.shcode = b.shcode
+order by sma5/sma20 
+	]]>
+ 	</select>
+ 	  	
+  	<!-- 20일선이 60일선 상향돌파 종목 -->
+ 	<select id="ma20_60_upward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma20/sma60*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma20 > sma60 and ysma20 < ysma60) b
+where a.shcode = b.shcode
+order by sma20/sma60 desc
+	]]>
+ 	</select>
+  	
+  	<!-- 20일선이 60일선 하향돌파 종목 -->
+ 	<select id="ma20_60_downward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma20/sma60*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma20 < sma60 and ysma20 > ysma60) b
+where a.shcode = b.shcode
+order by sma20/sma60
+	]]>
+ 	</select>
+ 
+   	<!-- 최근 N개장일동안 5일선이 20일선을 K번이상 상향돌파한 종목 -->
+ 	<select id="ma5_20_upward_dayN_moreK" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.cnt count
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (
+ select shcode, count(date) cnt
+ from dchart
+ where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} 
+  and ysma5 < ysma20 and sma5 > sma20
+ group by shcode
+    having cnt >= #{count}
+ ) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select>
+  	
+  	<!-- 최근 N개장일동안 5일선이 20일선을 K번이상 하향돌파한 종목 -->
+ 	<select id="ma5_20_downward_dayN_moreK" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.cnt count
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (
+ select shcode, count(date) cnt
+ from dchart
+ where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} 
+  and ysma5 > ysma20 and sma5 < sma20
+ group by shcode
+    having cnt >= #{count}
+ ) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select>
+
+  	<!-- 기준일 종가 > 5일선 > 20일선 > 60일선 > 120일선 (정배열) -->
+ 	<select id="ma_arrange_positive" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b
+where a.shcode=b.shcode and b.close>b.sma5 and b.sma5>b.sma20 and b.sma20>b.sma60 and b.sma60>b.sma120
+	]]>
+ 	</select> 
+
+
+  	<!-- 기준일 종가 < 5일선 < 20일선 < 60일선 < 120일선 (역배열) -->
+ 	<select id="ma_arrange_negative" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b
+where a.shcode=b.shcode and b.close<b.sma5 and b.sma5<b.sma20 and b.sma20<b.sma60 and b.sma60<b.sma120
+	]]>
+ 	</select> 	 		 	 					 	 				
+
+  	<!-- 5일선,20일선,60일선,120일선이 +- 5% 이내 (이동평균선 수렴) 이고 5일선이 20일선을 상향돌파 -->
+ 	<select id="convergent_ma5_20_upward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma5/sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} 
+  and ((close-sma5)/close*100<5 or (sma5-close)/close*100<5) 
+        and ((close-sma20)/close*100<5 or (sma20-close)/close*100<5) 
+        and ((close-sma60)/close*100<5 or (sma60-close)/close*100<5)
+        and ((close-sma120)/close*100<5 or (sma120-close)/close*100<5) 
+        and sma5 > sma20 and ysma5 < ysma20) b
+where a.shcode = b.shcode
+order by sma5/sma20 desc
+	]]>
+ 	</select>
+
+  	<!-- 5일선,20일선,60일선,120일선이 +- 5% 이내 (이동평균선 수렴) 이고 5일선이 20일선을 하향돌파 -->
+ 	<select id="convergent_ma5_20_downward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, sma5/sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} 
+  and ((close-sma5)/close*100<5 or (sma5-close)/close*100<5) 
+        and ((close-sma20)/close*100<5 or (sma20-close)/close*100<5) 
+        and ((close-sma60)/close*100<5 or (sma60-close)/close*100<5)
+        and ((close-sma120)/close*100<5 or (sma120-close)/close*100<5) 
+        and sma5 < sma20 and ysma5 > ysma20) b
+where a.shcode = b.shcode
+order by sma5/sma20 
+	]]>
+ 	</select>
+ 		 
+  	<!-- 주봉 5일선이 20일선을 상향돌파한 종목 -->
+ 	<select id="week_ma5_20_upward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma5/c.sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma5 > sma20 and ysma5 < ysma20 
+ ) c 
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by c.sma5/c.sma20 desc
+	]]>
+ 	</select>
+  
+  	<!-- 주봉 5일선이 20일선을 하향돌파한 종목 -->
+ 	<select id="week_ma5_20_downward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma5/c.sma20*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma5 < sma20 and ysma5 > ysma20 
+ ) c 
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by c.sma5/c.sma20
+	]]>
+ 	</select>
+
+  	<!-- 주봉 20일선이 60일선 상향돌파한 종목 -->
+ 	<select id="week_ma20_60_upward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma20/c.sma60*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma20 > sma60 and ysma20 < ysma60 
+ ) c 
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by c.sma20/c.sma60 desc
+	]]>
+ 	</select>
+  
+  	<!-- 주봉 20일선이 60일선 하향돌파 종목 -->
+ 	<select id="week_ma20_60_downward" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma20/c.sma60*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+  (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma20 < sma60 and ysma20 > ysma60 
+ ) c 
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by c.sma20/c.sma60
+	]]>
+ 	</select>
+
+  
+
+<!-- 보조 지표 -->	
+  	<!-- macd +로 변화 종목 -->
+ 	<select id="macd_plus" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd > 0 and ymacd < 0) b
+where a.shcode = b.shcode
+	]]>
+ 	</select>  
+ 
+  	<!-- MACD 곡선이 기준선(0) 위에서 상승한 종목 -->
+ 	<select id="macd_rising_trend" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd > 0 and ymacd >0 and macd > ymacd) b
+where a.shcode = b.shcode
+	]]>
+ 	</select>  	
+ 
+  	<!-- MACD 곡선이 기준선(0) 아래에서 하락한 종목 -->
+ 	<select id="macd_falling_trend" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd < 0 and ymacd < 0 and macd < ymacd) b
+where a.shcode = b.shcode
+	]]>
+ 	</select> 
+  
+  	<!-- MACD 곡선이 시그널 선을 상향돌파(골든크로스) 종목 -->
+ 	<select id="macd_golden_cross" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd > macdsig and ymacd < macdsig) b
+where a.shcode = b.shcode
+	]]>
+ 	</select> 
+  
+  	<!-- MACD 곡선이 시그널 선을 하향돌파(데드크로스) 종목 -->
+ 	<select id="macd_dead_cross" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd < macdsig and ymacd > macdsig) b
+where a.shcode = b.shcode
+	]]>
+ 	</select> 
+  
+  	<!-- RSI(상대적주가강도) 70% 이상인 종목 -->
+ 	<select id="rsi_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi >= #{rateM}) b
+where a.shcode = b.shcode
+order by b.rsi desc
+	]]>
+ 	</select> 
+  
+  	<!-- RSI(상대적주가강도) 30% 이하인 종목 -->
+ 	<select id="rsi_lessM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi <= #{rateM}) b
+where a.shcode = b.shcode
+order by b.rsi
+	]]>
+ 	</select> 
+  
+  	<!-- RSI가 70% 를 하향돌파 종목 -->
+ 	<select id="rsi_downwardM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi < #{rateM} and yrsi > #{rateM}) b
+where a.shcode = b.shcode
+order by b.rsi
+	]]>
+ 	</select> 	 
+   
+  	<!-- RSI가 30% 를 상향돌파 -->
+ 	<select id="rsi_upwardM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi > #{rateM} and yrsi < #{rateM}) b
+where a.shcode = b.shcode
+order by b.rsi
+	]]>
+ 	</select> 
+   
+  	<!-- 스톡캐스트 지표가 80% 이상인 종목 -->
+ 	<select id="stocastic_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd >= #{rateM}) b
+where a.shcode = b.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+
+ 	 	   
+  	<!-- 스톡캐스틱 지표가 20% 이하인 종목 -->
+ 	<select id="stocastic_lessM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd <= #{rateM}) b
+where a.shcode = b.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+ 	   
+  	<!-- 스톡캐스트 지표가 80%를 상향돌파 종목 -->
+ 	<select id="stocastic_upwardM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd > #{rateM} and yslowd < #{rateM}) b
+where a.shcode = b.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+   
+  	<!-- 스톡캐스트 지표가 80%를 하향돌파 종목 -->
+ 	<select id="stocastic_dowwardM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd < #{rateM} and yslowd > #{rateM}) b
+where a.shcode = b.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+ 	 	   
+  	<!-- 스톡캐스트 %K가 %D를 골든크로스 종목 -->
+ 	<select id="stocastic_golden_cross" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowk > slowd and yslowk < yslowd) b
+where a.shcode = b.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+ 	 	   
+  	<!-- 스톡캐스트  %K가 %D를 데드크로스 종목 -->
+ 	<select id="stocastic_dead_cross" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowk < slowd and yslowk > yslowd) b
+where a.shcode = b.shcode
+order by b.slowd desc
+	]]>
+ 	</select> 	
+ 	 	 	    
+  	<!-- 체결강도가 50% 이상인 종목 -->
+ 	<select id="deal_strength_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+	<choose>
+	  <when test="duration == 1">
+	   <![CDATA[ and c.todayvp >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 5">
+	   <![CDATA[ and c.ma5vp >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and c.ma10vp >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and c.ma20vp >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>	 	 
+
+  	<!-- 체결강도가 50% 이하인 종목 -->
+ 	<select id="deal_strength_lessM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+	<choose>
+	  <when test="duration == 1">
+	   <![CDATA[ and c.todayvp <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 5">
+	   <![CDATA[ and c.ma5vp <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and c.ma10vp <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and c.ma20vp <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>	      
+       
+  	<!-- 전일대비 체결강도가 M% 이상 증가한 종목 -->
+ 	<select id="deal_strength_rising_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dstock where 
+     date = (select date from jonghap where date < #{basedate} order by date desc limit 1)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+ and (c.todayvp-d.todayvp)/d.todayvp*100 >= #{rateM}
+	]]>
+ 	</select>
+       
+  	<!-- 전일대비 체결강도가 M% 이상 하락한 종목 -->
+ 	<select id="deal_strength_falling_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dstock where 
+     date = (select date from jonghap where date < #{basedate} order by date desc limit 1)) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+ and (d.todayvp-c.todayvp)/d.todayvp*100 >= #{rateM}
+	]]>
+ 	</select>
+
+
+               
+  	<!-- 10일 투자심리선 80% 이상 종목 -->
+ 	<select id="psychology_line10_moreM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode and c.incdays10/10*100 >= #{rateM}
+	]]>
+ 	</select>
+ 	        
+  	<!-- 10일 투자심리선 20% 이하 종목 -->
+ 	<select id="psychology_line10_lessM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+  (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode and c.incdays10/10*100 <= #{rateM}
+	]]>
+ 	</select>
+       
+  	<!-- 10일 투자심리선이 20% 미만에서 상승반전 종목 -->
+ 	<select id="psychology_line10_upwardM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode  
+ and c.yincdays10/10*100 <= #{rateM} and c.incdays10/10*100 > #{rateM}
+	]]>
+ 	</select>
+
+       
+  	<!-- 10일 투자심리선이 80% 위에서 하락반전 종목 -->
+ 	<select id="psychology_line10_downwardM" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode  
+ and c.yincdays10/10*100 >= #{rateM} and c.incdays10/10*100 < #{rateM}
+	]]>
+ 	</select> 	
+ 
+       
+  	<!-- 이동평균선과 주가 이격률이 M% 이하 종목 -->
+ 	<select id="seperation_rate_maN_lessM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.a.op_profit_rate_y ic_rate ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   b.close/b.sma5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.close/b.sma10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.close/b.sma20*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.close/b.sma60*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.close/b.sma120*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b
+where a.shcode = b.shcode 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.close/b.sma5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.close/b.sma10*100 <= #{rateM}} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.close/b.sma20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.close/b.sma60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.close/b.sma120*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+        
+  	<!-- 이동평균선과 주가 이격률이 M% 이상 종목 -->
+ 	<select id="seperation_rate_maN_moreM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.a.op_profit_rate_y ic_rate ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   b.close/b.sma5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.close/b.sma10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.close/b.sma20*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.close/b.sma60*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.close/b.sma120*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b
+where a.shcode = b.shcode
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.close/b.sma5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.close/b.sma10*100 >= #{rateM}} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.close/b.sma20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.close/b.sma60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.close/b.sma120*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select> 	
+ 	
+ <!-- 고급 분석 -->	 
+  	<!-- 5: N거래일 최저점대비 M%이하 상승한 종목 -->
+ 	<select id="rising_dayN_min_lessM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.min5)/c.min5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.min10)/c.min10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.min20)/c.min20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.min30)/c.min30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.min60)/c.min60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.min90)/c.min90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.min120)/c.min120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.min150)/c.min150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.min180)/c.min180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.min250)/c.min250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.min500)/c.min500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode	
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (b.close-c.min5)/c.min5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (b.close-c.min10)/c.min10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (b.close-c.min20)/c.min20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (b.close-c.min30)/c.min30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (b.close-c.min60)/c.min60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (b.close-c.min90)/c.min90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (b.close-c.min120)/c.min120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (b.close-c.min150)/c.min150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (b.close-c.min180)/c.min180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (b.close-c.min250)/c.min250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (b.close-c.min500)/c.min500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+
+ 	</select>
+
+ 	<!-- 6: N거래일 최저점대비 M% 이상 상승한 종목 -->
+ 	<select id="rising_dayN_min_moreM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.min5)/c.min5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.min10)/c.min10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.min20)/c.min20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.min30)/c.min30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.min60)/c.min60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.min90)/c.min90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.min120)/c.min120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.min150)/c.min150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.min180)/c.min180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.min250)/c.min250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.min500)/c.min500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode	
+
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (b.close-c.min5)/c.min5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (b.close-c.min10)/c.min10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (b.close-c.min20)/c.min20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (b.close-c.min30)/c.min30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (b.close-c.min60)/c.min60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (b.close-c.min90)/c.min90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (b.close-c.min120)/c.min120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (b.close-c.min150)/c.min150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (b.close-c.min180)/c.min180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (b.close-c.min250)/c.min250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (b.close-c.min500)/c.min500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+
+ 	</select>
+ 
+  	<!-- 5: N거래일 최고점 대비 M%이하 하락한 종목 -->
+ 	<select id="falling_dayN_max_lessM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, 
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.max5)/c.max5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.max10)/c.max10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.max20)/c.max20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.max30)/c.max30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.max60)/c.max60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.max90)/c.max90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.max120)/c.max120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.max150)/c.max150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.max180)/c.max180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.max250)/c.max250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.max500)/c.max500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode	
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (c.max5-b.close)/c.max5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (c.max10-b.close)/c.max10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (c.max20-b.close)/c.max20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (c.max30-b.close)/c.max30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (c.max60-b.close)/c.max60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (c.max90-b.close)/c.max90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (c.max120-b.close)/c.max120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (c.max150-b.close)/c.max150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (c.max180-b.close)/c.max180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (c.max250-b.close)/c.max250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (c.max500-b.close)/c.max500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+
+ 	</select>
+
+ 	<!-- 6: N거래일 최고점대비 M% 이상 하락한 종목 -->
+ 	<select id="falling_dayN_max_moreM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, 
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.max5)/c.max5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.max10)/c.max10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.max20)/c.max20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.max30)/c.max30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.max60)/c.max60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.max90)/c.max90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.max120)/c.max120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.max150)/c.max150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.max180)/c.max180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.max250)/c.max250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.max500)/c.max500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode	
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (c.max5-b.close)/c.max5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (c.max10-b.close)/c.max10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (c.max20-b.close)/c.max20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (c.max30-b.close)/c.max30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (c.max60-b.close)/c.max60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (c.max90-b.close)/c.max90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (c.max120-b.close)/c.max120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (c.max150-b.close)/c.max150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (c.max180-b.close)/c.max180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (c.max250-b.close)/c.max250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (c.max500-b.close)/c.max500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+ 
+  	<!-- N거래일 최고가에서 M% 이상 하락후, 당일 K% 이상 상승한 종목 (장대 양봉 종목) -->
+ 	<select id="rising_moreK_after_falling_dayN_max_moreM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.yclose-c.max5)/c.max5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.yclose-c.max10)/c.max10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.yclose-c.max20)/c.max20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.yclose-c.max30)/c.max30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.yclose-c.max60)/c.max60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.yclose-c.max90)/c.max90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.yclose-c.max120)/c.max120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.yclose-c.max150)/c.max150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.yclose-c.max180)/c.max180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.yclose-c.max250)/c.max250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.yclose-c.max500)/c.max500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode and (b.close-b.yclose)/b.yclose*100 >= #{rateK}
+
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (c.max5-b.yclose)/c.max5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (c.max10-b.yclose)/c.max10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (c.max20-b.yclose)/c.max20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (c.max30-b.yclose)/c.max30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (c.max60-b.yclose)/c.max60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (c.max90-b.yclose)/c.max90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (c.max120-b.yclose)/c.max120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (c.max150-b.yclose)/c.max150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (c.max180-b.yclose)/c.max180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (c.max250-b.yclose)/c.max250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (c.max500-b.yclose)/c.max500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+
+ 	
+ 	<!-- N거래일 최저가에서 M% 이상 상승후, 당일 K% 이상 하락한 종목 (장대 음봉 종목) -->
+ 	<select id="falling_moreK_after_rising_dayN_min_moreM" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.yclose-c.min5)/c.min5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.yclose-c.min10)/c.min10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.yclose-c.min20)/c.min20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.yclose-c.min30)/c.min30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.yclose-c.min60)/c.min60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.yclose-c.min90)/c.min90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.yclose-c.min120)/c.min120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.yclose-c.min150)/c.min150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.yclose-c.min180)/c.min180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.yclose-c.min250)/c.min250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.yclose-c.min500)/c.min500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode and (b.yclose-b.close)/b.yclose*100 >= #{rateK}
+
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (b.yclose-c.min5)/c.min5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (b.yclose-c.min10)/c.min10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (b.yclose-c.min20)/c.min20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (b.yclose-c.min30)/c.min30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (b.yclose-c.min60)/c.min60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (b.yclose-c.min90)/c.min90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (b.yclose-c.min120)/c.min120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (b.yclose-c.min150)/c.min150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (b.yclose-c.min180)/c.min180*100 >= #{rateM} ]]>
+	  </when>	 
+	  <when test="duration == 250">
+	   <![CDATA[ and (b.yclose-c.min250)/c.min250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (b.yclose-c.min500)/c.min500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>			 	 
+
+  	<!-- 기간 평균 거래량 대비 M% 이상인 종목 -->
+ 	<select id="volume_uprate_dayN_moreM" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		b.volume/c.vavg5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.volume/c.vavg10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.volume/c.vavg20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   b.volume/c.vavg30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.volume/c.vavg60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   b.volume/c.vavg90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.volume/c.vavg120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   b.volume/c.vavg150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   b.volume/c.vavg180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   b.volume/c.vavg250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   b.volume/c.vavg500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date= #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.volume > 10000 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.volume/c.vavg5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.volume/c.vavg10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.volume/c.vavg20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and b.volume/c.vavg30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.volume/c.vavg60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and b.volume/c.vavg90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.volume/c.vavg120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and b.volume/c.vavg150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and b.volume/c.vavg180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and b.volume/c.vavg250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and b.volume/c.vavg500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+ 
+  	<!-- 기간 평균 거래량 대비 M% 이하인 종목 -->
+ 	<select id="volume_downrate_dayN_lessM" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		b.volume/c.vavg5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.volume/c.vavg10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.volume/c.vavg20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   b.volume/c.vavg30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.volume/c.vavg60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   b.volume/c.vavg90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.volume/c.vavg120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   b.volume/c.vavg150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   b.volume/c.vavg180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   b.volume/c.vavg250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   b.volume/c.vavg500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date= #{basedate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode and b.volume > 10000 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.volume/c.vavg5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.volume/c.vavg10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.volume/c.vavg20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and b.volume/c.vavg30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.volume/c.vavg60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and b.volume/c.vavg90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.volume/c.vavg120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and b.volume/c.vavg150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and b.volume/c.vavg180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and b.volume/c.vavg250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and b.volume/c.vavg500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+
+ 	<!-- Pattern 분석: 250일 장기하락 추세, 최근5일 단기 상승 종목 -->
+ 	<select id="day250_decline_day5_rebound" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where 
+	a.shcode = b.shcode and b.shcode = c.shcode
+    and (c.close250 - c.close5)/c.close250*100 >= 20
+	and (c.max250 - c.avg250)/c.avg250*100 <= 30
+	and (c.avg250 - c.min250)/c.avg250*100 <= 30
+    and (c.close - c.close5)/c.close5*100 >=5
+	]]>
+ 	</select>
+ 	
+ 	<!-- Pattern 분석: 120일 하락 추세, 최근5일 단기 상승 종목 -->
+ 	<select id="day120_decline_day5_rebound" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where 
+	a.shcode = b.shcode and b.shcode = c.shcode
+    and (c.close120 - c.close5)/c.close120*100 >= 10
+	and (c.max120 - c.avg120)/c.avg120*100 <= 30
+	and (c.avg120 - c.min120)/c.avg120*100 <= 30
+    and (c.close - c.close5)/c.close5*100 >=5
+	]]>
+ 	</select>	
+
+ 	<!-- Pattern 분석: 30일 하락 추세, 최근5일 단기 상승 종목 -->
+ 	<select id="day30_decline_day5_rebound" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where 
+	a.shcode = b.shcode and b.shcode = c.shcode
+    and (c.close30 - c.close5)/c.close30*100 >= 10
+	and (c.max30 - c.avg30)/c.avg30*100 <= 30
+	and (c.avg30 - c.min30)/c.avg30*100 <= 30
+    and (c.close - c.close5)/c.close5*100 >=5
+	]]>
+ 	</select>	
+ 	
+ 	<!-- Pattern 분석: 250일 횡보 추세, 최근5일 단기 상승 종목 -->
+ 	<select id="day250_flat_day5_rebound" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where 
+	a.shcode = b.shcode and b.shcode = c.shcode
+    and (c.close250 - c.close5)/c.close250*100 <= 10
+	and (c.max250 - c.avg250)/c.avg250*100 <= 10
+	and (c.avg250 - c.min250)/c.avg250*100 <= 10
+    and (c.close - c.close5)/c.close5*100 >=5
+	]]>
+ 	</select>
+ 	
+ 	<!-- Pattern 분석: 120일 횡보 추세, 최근5일 단기 상승 종목 -->
+ 	<select id="day120_flat_day5_rebound" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where 
+	a.shcode = b.shcode and b.shcode = c.shcode
+    and (c.close120 - c.close5)/c.close120*100 <= 10
+	and (c.max120 - c.avg120)/c.avg120*100 <= 9
+	and (c.avg120 - c.min120)/c.avg120*100 <= 9
+    and (c.close - c.close5)/c.close5*100 >=5
+	]]>
+ 	</select>	
+
+ 	<!-- Pattern 분석: 30일 횡보 추세, 최근5일 단기 상승 종목 -->
+ 	<select id="day30_flat_day5_rebound" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		(b.close-b.yclose)/b.yclose*100 diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c
+where 
+	a.shcode = b.shcode and b.shcode = c.shcode
+    and (c.close30 - c.close5)/c.close30*100 <= 5
+	and (c.max30 - c.avg30)/c.avg30*100 <= 5
+	and (c.avg30 - c.min30)/c.avg30*100 <= 5
+    and (c.close - c.close5)/c.close5*100 >=5
+	]]>
+ 	</select>
+ 	
+ 	
+ 	 	
+
+<!--  시뮬레이ㅣ션  -->
+ <!-- 기본 분석  --> 	 	 
+ 	<!-- N거래일 M% 이상 상승한 종목 -->
+ 	<select id="rising_dayN_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-c.close)/c.close*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and (b.close-c.close)/c.close*100 >= #{rateM}
+	]]>
+ 	</select>
+ 	
+ 	<!-- N거래일 M% 이상 하락한 종목 -->
+ 	<select id="falling_dayN_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-c.close)/c.close*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and (c.close-b.close)/c.close*100 >= #{rateM}
+	]]>
+ 	</select>
+ 	
+    	
+ 	<!--  N개장일 주가변동이 +- M% 이상인 종목 -->
+ 	<select id="fluctuation_dayN_moreM_sim" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+	<choose>
+	  <when test="duration == 5">
+	   (min5-avg5)/avg5*100 rate1, (max5-avg5)/avg5*100 rate2 
+	  </when>
+	  <when test="duration == 10">
+	   (min10-avg10)/avg10*100 rate1, (max10-avg10)/avg10*100 rate2 
+	  </when>
+	  <when test="duration == 20">
+	   (min20-avg20)/avg20*100 rate1, (max20-avg20)/avg20*100 rate2 
+	  </when>
+	  <when test="duration == 30">
+	   (min30-avg30)/avg30*100 rate1, (max30-avg30)/avg30*100 rate2 
+	  </when>
+	  <when test="duration == 60">
+	   (min60-avg60)/avg60*100 rate1, (max60-avg60)/avg60*100 rate2 
+	  </when>
+	  <when test="duration == 90">
+	   (min90-avg90)/avg90*100 rate1, (max90-avg90)/avg90*100 rate2 
+	  </when>
+	  <when test="duration == 120">
+	   (min120-avg120)/avg120*100 rate1, (max120-avg120)/avg120*100 rate2 
+	  </when>
+	  <when test="duration == 150">
+	   (min150-avg150)/avg150*100 rate1, (max150-avg150)/avg150*100 rate2 
+	  </when>
+	  <when test="duration == 180">
+	   (min180-avg180)/avg180*100 rate1, (max180-avg180)/avg180*100 rate2 
+	  </when>
+	  <when test="duration == 250">
+	   (min250-avg250)/avg250*100 rate1, (max250-avg250)/avg250*100 rate2 
+	  </when>
+	  <when test="duration == 500">
+	   (min500-avg500)/avg500*100 rate1, (max500-avg500)/avg500*100 rate2 
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date= #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (avg5-min5)/avg5*100 >= #{rateM} and (max5-avg5)/avg5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (avg10-min10)/avg10*100 >= #{rateM} and (max10-avg10)/avg10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (avg20-min20)/avg20*100 >= #{rateM} and (max20-avg20)/avg20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (avg30-min30)/avg30*100 >= #{rateM} and (max30-avg30)/avg30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (avg60-min60)/avg60*100 >= #{rateM} and (max60-avg60)/avg60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (avg90-min90)/avg90*100 >= #{rateM} and (max90-avg90)/avg90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (avg120-min120)/avg120*100 >= #{rateM} and (max120-avg120)/avg120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (avg150-min150)/avg150*100 >= #{rateM} and (max150-avg150)/avg150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (avg180-min180)/avg180*100 >= #{rateM} and (max180-avg180)/avg180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (avg250-min250)/avg250*100 >= #{rateM} and (max250-avg250)/avg250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (avg500-min500)/avg500*100 >= #{rateM} and (max500-avg500)/avg500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select> 
+   	
+ 	<!--  N개장일 주가변동이 +- M% 이하인 종목 -->
+ 	<select id="fluctuation_dayN_lessM_sim" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   (min5-avg5)/avg5*100 rate1, (max5-avg5)/avg5*100 rate2 
+	  </when>
+	  <when test="duration == 10">
+	   (min10-avg10)/avg10*100 rate1, (max10-avg10)/avg10*100 rate2 
+	  </when>
+	  <when test="duration == 20">
+	   (min20-avg20)/avg20*100 rate1, (max20-avg20)/avg20*100 rate2 
+	  </when>
+	  <when test="duration == 30">
+	   (min30-avg30)/avg30*100 rate1, (max30-avg30)/avg30*100 rate2 
+	  </when>
+	  <when test="duration == 60">
+	   (min60-avg60)/avg60*100 rate1, (max60-avg60)/avg60*100 rate2 
+	  </when>
+	  <when test="duration == 90">
+	   (min90-avg90)/avg90*100 rate1, (max90-avg90)/avg90*100 rate2 
+	  </when>
+	  <when test="duration == 120">
+	   (min120-avg120)/avg120*100 rate1, (max120-avg120)/avg120*100 rate2 
+	  </when>
+	  <when test="duration == 150">
+	   (min150-avg150)/avg150*100 rate1, (max150-avg150)/avg150*100 rate2 
+	  </when>
+	  <when test="duration == 180">
+	   (min180-avg180)/avg180*100 rate1, (max180-avg180)/avg180*100 rate2 
+	  </when>
+	  <when test="duration == 250">
+	   (min250-avg250)/avg250*100 rate1, (max250-avg250)/avg250*100 rate2 
+	  </when>
+	  <when test="duration == 500">
+	   (min500-avg500)/avg500*100 rate1, (max500-avg500)/avg500*100 rate2 
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and volume > 0) b,
+ (select * from dprice where date= #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+
+		 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (avg5-min5)/avg5*100 <= #{rateM} and (max5-avg5)/avg5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (avg10-min10)/avg10*100 <= #{rateM} and (max10-avg10)/avg10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (avg20-min20)/avg20*100 <= #{rateM} and (max20-avg20)/avg20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (avg30-min30)/avg30*100 <= #{rateM} and (max30-avg30)/avg30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (avg30-min30)/avg30*100 <= #{rateM} and (max30-avg30)/avg30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (avg90-min90)/avg90*100 <= #{rateM} and (max90-avg90)/avg90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (avg120-min120)/avg120*100 <= #{rateM} and (max120-avg120)/avg120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (avg150-min150)/avg150*100 <= #{rateM} and (max150-avg150)/avg150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (avg180-min180)/avg180*100 <= #{rateM} and (max180-avg180)/avg180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (avg250-min250)/avg250*100 <= #{rateM} and (max250-avg250)/avg250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (avg500-min500)/avg500*100 <= #{rateM} and (max500-avg500)/avg500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select> 	
+ 
+
+ 	<!-- N거래일 연속상승 종목 -->
+ 	<select id="cont_rising_dayN_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(sign) cnt_sign from dstock 
+  where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1) 
+ and #{basedate} and diff > 0
+    group by shcode
+    having count(sign) = #{duration}) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	]]>
+ 	</select>
+ 	 		
+ 	<!-- N거래일 연속하락 종목 -->
+ 	<select id="cont_falling_dayN_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(sign) cnt_sign from dstock 
+  where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1) 
+  and #{basedate} and diff < 0
+  group by shcode
+  having count(sign) = #{duration}) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	]]>
+ 	</select>
+
+ 	
+ 	<!-- 전일대비 공매도  M% 이상 증가한 종목 -->
+ 	<select id="gongmaedo_rising_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (c.gmvolume-d.gmvolume)/d.gmvolume*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (select * from lender where date=#{basedate} and gmvolume >0 ) c,
+ (select * from lender 
+  where date=(select date from lender where date < #{basedate} order by date desc limit 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+ and (c.gmvolume-d.gmvolume)/d.gmvolume*100 >= #{rateM}
+	]]>
+ 	</select>
+	
+ 	
+ 	<!-- 전일대비 신용잔고가  M% 이상 증가한 종목 -->
+ 	<select id="sinyong_rising_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (c.sybalance -d.sybalance)/d.sybalance *100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (select * from lender where date=#{basedate} and sybalance >0 ) c,
+ (select * from lender 
+  where date=(select date from lender where date < #{basedate} order by date desc limit 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode  and d.shcode = e.shcode 
+ and (c.sybalance -d.sybalance)/d.sybalance*100 >= #{rateM}
+	]]>
+ 	</select>  	
+
+ 	 	 	 	
+ 	<!-- N이  M% 이상 보유한 종목 -->
+ 	<select id="holderN_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.rate rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from shareholder where holder=#{holder}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and rate >= #{rateM}
+	]]>
+ 	</select>
+ 	
+  	<!-- 외국/국내 기관투자가가 보유한 종목 -->
+ 	<select id="holderKK_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, sum(rate) rate1 from shareholder  
+  where holder = '국민연금' or holder like "%운용%" or holder like "%fe%" or holder like "%te%" 
+  or holder like "%sch" or holder like "%Rua%" or holder like "%red%" or holder like "%Pro%" 
+  or holder like "%pio%" or holder like "%삼성전자%" or holder like "%Laz%"or holder like "%her%" 
+  or holder like "%Him%" or holder like "%Gsy%" or holder like "first%" or holder like "%value%" 
+  or holder like "%Ass%"or holder like "%fi%" or holder like "%cap%" or holder like "%col%" 
+  or holder like "%invest%" or holder like "%black%" or holder like "%Morgan%"or holder like "%투자밸류%"
+  group by shcode)  c,
+  (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and h_rate >= #{rateM}
+	]]>
+ 	</select>	 
+	
+  	<!-- 최근 N개장일 외국인 지분율 M% 이상 증가한 종목 -->
+ 	<select id="foreign_rate_rising_dayN_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, a.f_rate rate1, a.f_rate-c.f_rate rate2,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from ssummary
+  where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and a.f_rate-c.f_rate >= #{rateM}
+	]]>
+ 	</select>
+ 
+  	
+  	<!-- 최근 N개장일 외국인 지분율 M% 이상 하락한 종목 -->
+ 	<select id="foreign_rate_falling_dayN_lessM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, a.f_rate rate1, a.f_rate-c.f_rate rate2,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from ssummary
+  where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and c.f_rate-a.f_rate >= #{rateM}
+	]]>
+ 	</select> 
+
+ 	 	
+ 	<!-- 최근 N개장일 연속 외국인 매수 종목 -->
+ 	<select id="foreign_cont_buying_dayN_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(fpvolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and fpvolume > 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	]]>
+ 	</select> 	
+  	
+ 	<!-- 최근 N개장일 연속 외국인 매도 종목 -->
+ 	<select id="foreign_cont_selling_dayN_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(fpvolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and fpvolume < 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	]]>
+ 	</select>
+ 	   	
+ 	<!-- 최근 N개장일 연속 기관매수 종목 -->
+ 	<select id="company_cont_buying_dayN_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(covolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and covolume > 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	]]>
+ 	</select> 
+ 	
+  	<!-- 최근 N개장일 연속 기관매도 종목 -->
+ 	<select id="company_cont_selling_dayN_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, (b.close-d.close)/d.close*100 rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select shcode, count(covolume) cnt from dstock
+  where date between (select date from jonghap a where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} and covolume < 0
+     group by shcode
+     having cnt = #{duration}
+ ) c,
+ (select * from dchart where date = (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode=b.shcode and b.shcode=c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+	]]>
+ 	</select> 
+
+
+<!-- 이동평균선 분석 -->  	
+  	<!-- 5일선이 20일선 상향돌파 종목 -->
+ 	<select id="ma5_20_upward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma5/b.sma20*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 > sma20 and ysma5 < ysma20) b,
+    (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode=c.shcode 
+order by b.sma5/b.sma20 desc
+	]]>
+ 	</select>
+  	
+  	<!-- 5일선이 20일선 하향돌파 종목 -->
+ 	<select id="ma5_20_downward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma5/b.sma20*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 < sma20 and ysma5 > ysma20) b,
+    (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by b.sma5/b.sma20 
+	]]>
+ 	</select>
+
+  	<!-- 5일선이 20일선 상향돌파, 종가 M% 이상 상승 종목 -->
+ 	<select id="ma5_20_upward_rising_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma5/b.sma20*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 > sma20 and ysma5 < ysma20 and (close-yclose)/yclose*100 >=#{rateM}) b,
+    (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by b.sma5/b.sma20 desc
+	]]>
+ 	</select>
+  	
+  	<!-- 5일선이 20일선 하향돌파, 종가 M% 이상 하락 종목 -->
+ 	<select id="ma5_20_downward_falling_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma5/b.sma20*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma5 < sma20 and ysma5 > ysma20 and (yclose-close)/yclose*100 >=#{rateM}) b,
+    (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by b.sma5/b.sma20 
+	]]>
+ 	</select>
+ 	  	
+  	<!-- 20일선이 60일선 상향돌파 종목 -->
+ 	<select id="ma20_60_upward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma20/b.sma60*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma20 > sma60 and ysma20 < ysma60) b,
+    (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by b.sma20/b.sma60 desc
+	]]>
+ 	</select>
+  	
+  	<!-- 20일선이 60일선 하향돌파 종목 -->
+ 	<select id="ma20_60_downward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma20/b.sma60*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate} and sma20 < sma60 and ysma20 > ysma60) b,
+    (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode=c.shcode
+order by b.sma20/b.sma60
+	]]>
+ 	</select>
+ 
+   	<!-- 최근 N개장일동안 5일선이 20일선을 K번이상 상향돌파한 종목 -->
+ 	<select id="ma5_20_upward_dayN_moreK_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.cnt count,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (
+ select shcode, count(date) cnt
+ from dchart
+ where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} 
+  and ysma5 < ysma20 and sma5 > sma20
+ group by shcode
+    having cnt >= #{count}
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select>
+  	
+  	<!-- 최근 N개장일동안 5일선이 20일선을 K번이상 하향돌파한 종목 -->
+ 	<select id="ma5_20_downward_dayN_moreK_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.cnt count,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (
+ select shcode, count(date) cnt
+ from dchart
+ where date between (select date from jonghap where date <= #{basedate} order by date desc limit #{duration1}, 1)
+  and #{basedate} 
+  and ysma5 > ysma20 and sma5 < sma20
+ group by shcode
+    having cnt >= #{count}
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode
+	]]>
+ 	</select>
+
+  	<!-- 기준일 종가 > 5일선 > 20일선 > 60일선 > 120일선 (정배열) -->
+ 	<select id="ma_arrange_positive_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode=b.shcode and b.shcode = c.shcode and b.close>b.sma5 and b.sma5>b.sma20 and b.sma20>b.sma60 and b.sma60>b.sma120
+	]]>
+ 	</select> 
+
+
+  	<!-- 기준일 종가 < 5일선 < 20일선 < 60일선 < 120일선 (역배열) -->
+ 	<select id="ma_arrange_negative_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode=b.shcode and b.shcode = c.shcode and b.close<b.sma5 and b.sma5<b.sma20 and b.sma20<b.sma60 and b.sma60<b.sma120
+	]]>
+ 	</select> 	 		 	 					 	 				
+
+  	<!-- 5일선,20일선,60일선,120일선이 +- 5% 이내 (이동평균선 수렴) 이고 5일선이 20일선을 상향돌파 -->
+ 	<select id="convergent_ma5_20_upward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma5/b.sma20*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} 
+  and ((close-sma5)/close*100<5 or (sma5-close)/close*100<5) 
+        and ((close-sma20)/close*100<5 or (sma20-close)/close*100<5) 
+        and ((close-sma60)/close*100<5 or (sma60-close)/close*100<5)
+        and ((close-sma120)/close*100<5 or (sma120-close)/close*100<5) 
+        and sma5 > sma20 and ysma5 < ysma20) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode 
+order by b.sma5/b.sma20 desc
+	]]>
+ 	</select>
+
+  	<!-- 5일선,20일선,60일선,120일선이 +- 5% 이내 (이동평균선 수렴) 이고 5일선이 20일선을 하향돌파 -->
+ 	<select id="convergent_ma5_20_downward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.sma5/b.sma20*100 rate1,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} 
+  and ((close-sma5)/close*100<5 or (sma5-close)/close*100<5) 
+        and ((close-sma20)/close*100<5 or (sma20-close)/close*100<5) 
+        and ((close-sma60)/close*100<5 or (sma60-close)/close*100<5)
+        and ((close-sma120)/close*100<5 or (sma120-close)/close*100<5) 
+        and sma5 < sma20 and ysma5 > ysma20) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.sma5/b.sma20 
+	]]>
+ 	</select>
+ 		 
+  	<!-- 주봉 5일선이 20일선을 상향돌파한 종목 -->
+ 	<select id="week_ma5_20_upward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma5/c.sma20*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma5 > sma20 and ysma5 < ysma20 
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+order by c.sma5/c.sma20 desc
+	]]>
+ 	</select>
+  
+  	<!-- 주봉 5일선이 20일선을 하향돌파한 종목 -->
+ 	<select id="week_ma5_20_downward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma5/c.sma20*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma5 < sma20 and ysma5 > ysma20 
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+order by c.sma5/c.sma20
+	]]>
+ 	</select>
+
+  	<!-- 주봉 20일선이 60일선 상향돌파한 종목 -->
+ 	<select id="week_ma20_60_upward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma20/c.sma60*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma20 > sma60 and ysma20 < ysma60 
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+order by c.sma20/c.sma60 desc
+	]]>
+ 	</select>
+  
+  	<!-- 주봉 20일선이 60일선 하향돌파 종목 -->
+ 	<select id="week_ma20_60_downward_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.sma20/c.sma60*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+  (select * from dchart where date = #{basedate}) b,
+ (select * from wchart
+  where date = (select date from wchart  
+    where date <= #{basedate} and shcode='005930' order by date desc limit 1)
+  and sma20 < sma60 and ysma20 > ysma60 
+ ) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode=c.shcode and c.shcode = d.shcode
+order by c.sma20/c.sma60
+	]]>
+ 	</select>
+
+  
+
+<!-- 보조 지표 -->	
+  	<!-- macd +로 변화 종목 -->
+ 	<select id="macd_plus_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd > 0 and ymacd < 0) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select>  
+ 
+  	<!-- MACD 곡선이 기준선(0) 위에서 상승한 종목 -->
+ 	<select id="macd_rising_trend_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd > 0 and ymacd >0 and macd > ymacd) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select>  	
+ 
+  	<!-- MACD 곡선이 기준선(0) 아래에서 하락한 종목 -->
+ 	<select id="macd_falling_trend_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 rate, b.macd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd < 0 and ymacd < 0 and macd < ymacd) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select> 
+  
+  	<!-- MACD 곡선이 시그널 선을 상향돌파(골든크로스) 종목 -->
+ 	<select id="macd_golden_cross_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd > macdsig and ymacd < macdsig) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select> 
+  
+  	<!-- MACD 곡선이 시그널 선을 하향돌파(데드크로스) 종목 -->
+ 	<select id="macd_dead_cross_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.macd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate} and macd < macdsig and ymacd > macdsig) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+	]]>
+ 	</select> 
+  
+  	<!-- RSI(상대적주가강도) 70% 이상인 종목 -->
+ 	<select id="rsi_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi >= #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.rsi desc
+	]]>
+ 	</select> 
+  
+  	<!-- RSI(상대적주가강도) 30% 이하인 종목 -->
+ 	<select id="rsi_lessM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi <= #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.rsi
+	]]>
+ 	</select> 
+  
+  	<!-- RSI가 70% 를 하향돌파 종목 -->
+ 	<select id="rsi_downwardM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,   
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi < #{rateM} and yrsi > #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.rsi
+	]]>
+ 	</select> 	 
+   
+  	<!-- RSI가 30% 를 상향돌파 -->
+ 	<select id="rsi_upwardM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,   
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.rsi,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and rsi > #{rateM} and yrsi < #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.rsi
+	]]>
+ 	</select> 
+   
+  	<!-- 스톡캐스트 지표가 80% 이상인 종목 -->
+ 	<select id="stocastic_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,    
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd >= #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+
+ 	 	   
+  	<!-- 스톡캐스틱 지표가 20% 이하인 종목 -->
+ 	<select id="stocastic_lessM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,   
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd <= #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+ 	   
+  	<!-- 스톡캐스트 지표가 80%를 상향돌파 종목 -->
+ 	<select id="stocastic_upwardM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd > #{rateM} and yslowd < #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+   
+  	<!-- 스톡캐스트 지표가 80%를 하향돌파 종목 -->
+ 	<select id="stocastic_dowwardM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowd < #{rateM} and yslowd > #{rateM}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+ 	 	   
+  	<!-- 스톡캐스트 %K가 %D를 골든크로스 종목 -->
+ 	<select id="stocastic_golden_cross_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowk > slowd and yslowk < yslowd) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.slowd desc
+	]]>
+ 	</select>
+ 	 	   
+  	<!-- 스톡캐스트  %K가 %D를 데드크로스 종목 -->
+ 	<select id="stocastic_dead_cross_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, b.slowd,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date=#{basedate}) a,
+ (select * from dchart where date=#{basedate} and slowk < slowd and yslowk > yslowd) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode
+order by b.slowd desc
+	]]>
+ 	</select> 	
+ 	 	 	    
+  	<!-- 체결강도가 50% 이상인 종목 -->
+ 	<select id="deal_strength_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	]]>
+	<choose>
+	  <when test="duration == 1">
+	   <![CDATA[ and c.todayvp >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 5">
+	   <![CDATA[ and c.ma5vp >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and c.ma10vp >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and c.ma20vp >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>	 	 
+
+  	<!-- 체결강도가 50% 이하인 종목 -->
+ 	<select id="deal_strength_lessM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+    (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	]]>
+	<choose>
+	  <when test="duration == 1">
+	   <![CDATA[ and c.todayvp <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 5">
+	   <![CDATA[ and c.ma5vp <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and c.ma10vp <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and c.ma20vp <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>	      
+       
+  	<!-- 전일대비 체결강도가 M% 이상 증가한 종목 -->
+ 	<select id="deal_strength_rising_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dstock where 
+     date = (select date from jonghap where date < #{basedate} order by date desc limit 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+ and (c.todayvp-d.todayvp)/d.todayvp*100 >= #{rateM}
+	]]>
+ 	</select>
+       
+  	<!-- 전일대비 체결강도가 M% 이상 하락한 종목 -->
+ 	<select id="deal_strength_falling_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.todayvp rate1,
+		e.date targetdate, e.close targetprice, (e.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dstock where 
+     date = (select date from jonghap where date < #{basedate} order by date desc limit 1)) d,
+ (select * from dchart where date = #{targetdate}) e
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and d.shcode = e.shcode
+ and (d.todayvp-c.todayvp)/d.todayvp*100 >= #{rateM}
+	]]>
+ 	</select>
+
+
+               
+  	<!-- 10일 투자심리선 80% 이상 종목 -->
+ 	<select id="psychology_line10_moreM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+  (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode and c.incdays10/10*100 >= #{rateM}
+	]]>
+ 	</select>
+ 	        
+  	<!-- 10일 투자심리선 20% 이하 종목 -->
+ 	<select id="psychology_line10_lessM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+  (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and c.incdays10/10*100 <= #{rateM}
+	]]>
+ 	</select>
+       
+  	<!-- 10일 투자심리선이 20% 미만에서 상승반전 종목 -->
+ 	<select id="psychology_line10_upwardM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode  
+ and c.yincdays10/10*100 <= #{rateM} and c.incdays10/10*100 > #{rateM}
+	]]>
+ 	</select>
+
+       
+  	<!-- 10일 투자심리선이 80% 위에서 하락반전 종목 -->
+ 	<select id="psychology_line10_downwardM_sim" resultType="StockVO">
+ 	<![CDATA[
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, c.incdays10/10*100 rate1,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dstock where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode  and c.shcode = d.shcode
+ and c.yincdays10/10*100 >= #{rateM} and c.incdays10/10*100 < #{rateM}
+	]]>
+ 	</select> 	
+ 
+       
+  	<!-- 이동평균선과 주가 이격률이 M% 이하 종목 -->
+ 	<select id="seperation_rate_maN_lessM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,   
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   b.close/b.sma5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.close/b.sma10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.close/b.sma20*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.close/b.sma60*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.close/b.sma120*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.close/b.sma5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.close/b.sma10*100 <= #{rateM}} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.close/b.sma20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.close/b.sma60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.close/b.sma120*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+        
+  	<!-- 이동평균선과 주가 이격률이 M% 이상 종목 -->
+ 	<select id="seperation_rate_maN_moreM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,    
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		c.date targetdate, c.close targetprice, (c.close-b.close)/b.close*100 tgt_diff_rate,
+	<choose>
+	  <when test="duration == 5">
+	   b.close/b.sma5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.close/b.sma10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.close/b.sma20*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.close/b.sma60*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.close/b.sma120*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dchart where date = #{targetdate}) c
+where a.shcode = b.shcode and b.shcode = c.shcode 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.close/b.sma5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.close/b.sma10*100 >= #{rateM}} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.close/b.sma20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.close/b.sma60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.close/b.sma120*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select> 	
+ 	
+ 	
+ <!-- 고급 분석 -->	 
+  	<!-- 5: N거래일 최저점대비 M%이하 상승한 종목 -->
+ 	<select id="rising_dayN_min_lessM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,    
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.min5)/c.min5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.min10)/c.min10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.min20)/c.min20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.min30)/c.min30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.min60)/c.min60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.min90)/c.min90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.min120)/c.min120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.min150)/c.min150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.min180)/c.min180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.min250)/c.min250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.min500)/c.min500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (b.close-c.min5)/c.min5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (b.close-c.min10)/c.min10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (b.close-c.min20)/c.min20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (b.close-c.min30)/c.min30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (b.close-c.min60)/c.min60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (b.close-c.min90)/c.min90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (b.close-c.min120)/c.min120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (b.close-c.min150)/c.min150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (b.close-c.min180)/c.min180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (b.close-c.min250)/c.min250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (b.close-c.min500)/c.min500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+
+ 	</select>
+
+ 	<!-- 6: N거래일 최저점대비 M% 이상 상승한 종목 -->
+ 	<select id="rising_dayN_min_moreM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.min5)/c.min5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.min10)/c.min10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.min20)/c.min20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.min30)/c.min30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.min60)/c.min60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.min90)/c.min90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.min120)/c.min120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.min150)/c.min150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.min180)/c.min180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.min250)/c.min250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.min500)/c.min500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (b.close-c.min5)/c.min5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (b.close-c.min10)/c.min10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (b.close-c.min20)/c.min20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (b.close-c.min30)/c.min30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (b.close-c.min60)/c.min60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (b.close-c.min90)/c.min90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (b.close-c.min120)/c.min120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (b.close-c.min150)/c.min150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (b.close-c.min180)/c.min180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (b.close-c.min250)/c.min250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (b.close-c.min500)/c.min500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+
+ 	</select>
+ 
+  	<!-- 5: N거래일 최고점 대비 M%이하 하락한 종목 -->
+ 	<select id="falling_dayN_max_lessM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, 
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.max5)/c.max5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.max10)/c.max10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.max20)/c.max20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.max30)/c.max30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.max60)/c.max60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.max90)/c.max90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.max120)/c.max120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.max150)/c.max150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.max180)/c.max180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.max250)/c.max250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.max500)/c.max500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 	
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (c.max5-b.close)/c.max5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (c.max10-b.close)/c.max10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (c.max20-b.close)/c.max20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (c.max30-b.close)/c.max30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (c.max60-b.close)/c.max60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (c.max90-b.close)/c.max90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (c.max120-b.close)/c.max120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (c.max150-b.close)/c.max150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (c.max180-b.close)/c.max180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (c.max250-b.close)/c.max250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (c.max500-b.close)/c.max500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+
+ 	</select>
+
+ 	<!-- 6: N거래일 최고점대비 M% 이상 하락한 종목 -->
+ 	<select id="falling_dayN_max_moreM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate,  a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate, 
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate,
+	 <choose>
+	  <when test="duration == 5">
+		(b.close-c.max5)/c.max5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.close-c.max10)/c.max10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.close-c.max20)/c.max20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.close-c.max30)/c.max30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.close-c.max60)/c.max60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.close-c.max90)/c.max90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.close-c.max120)/c.max120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.close-c.max150)/c.max150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.close-c.max180)/c.max180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.close-c.max250)/c.max250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.close-c.max500)/c.max500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 	
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (c.max5-b.close)/c.max5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (c.max10-b.close)/c.max10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (c.max20-b.close)/c.max20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (c.max30-b.close)/c.max30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (c.max60-b.close)/c.max60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (c.max90-b.close)/c.max90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (c.max120-b.close)/c.max120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (c.max150-b.close)/c.max150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (c.max180-b.close)/c.max180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (c.max250-b.close)/c.max250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (c.max500-b.close)/c.max500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+ 
+  	<!-- N거래일 최고가에서 M% 이상 하락후, 당일 K% 이상 상승한 종목 (장대 양봉 종목) -->
+ 	<select id="rising_moreK_after_falling_dayN_max_moreM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate, 
+	 <choose>
+	  <when test="duration == 5">
+		(b.yclose-c.max5)/c.max5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.yclose-c.max10)/c.max10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.yclose-c.max20)/c.max20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.yclose-c.max30)/c.max30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.yclose-c.max60)/c.max60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.yclose-c.max90)/c.max90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.yclose-c.max120)/c.max120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.yclose-c.max150)/c.max150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.yclose-c.max180)/c.max180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.yclose-c.max250)/c.max250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.yclose-c.max500)/c.max500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and (b.close-b.yclose)/b.yclose*100 >= #{rateK}
+
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (c.max5-b.yclose)/c.max5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (c.max10-b.yclose)/c.max10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (c.max20-b.yclose)/c.max20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (c.max30-b.yclose)/c.max30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (c.max60-b.yclose)/c.max60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (c.max90-b.yclose)/c.max90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (c.max120-b.yclose)/c.max120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (c.max150-b.yclose)/c.max150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (c.max180-b.yclose)/c.max180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and (c.max250-b.yclose)/c.max250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (c.max500-b.yclose)/c.max500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+
+ 	
+ 	<!-- N거래일 최저가에서 M% 이상 상승후, 당일 K% 이상 하락한 종목 (장대 음봉 종목) -->
+ 	<select id="falling_moreK_after_rising_dayN_min_moreM_sim" resultType="StockVO">
+
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate, 
+	 <choose>
+	  <when test="duration == 5">
+		(b.yclose-c.min5)/c.min5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   (b.yclose-c.min10)/c.min10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   (b.yclose-c.min20)/c.min20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   (b.yclose-c.min30)/c.min30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   (b.yclose-c.min60)/c.min60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   (b.yclose-c.min90)/c.min90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   (b.yclose-c.min120)/c.min120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   (b.yclose-c.min150)/c.min150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   (b.yclose-c.min180)/c.min180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   (b.yclose-c.min250)/c.min250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   (b.yclose-c.min500)/c.min500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date = #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and (b.yclose-b.close)/b.yclose*100 >= #{rateK}
+
+	
+	 <choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and (b.yclose-c.min5)/c.min5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and (b.yclose-c.min10)/c.min10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and (b.yclose-c.min20)/c.min20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and (b.yclose-c.min30)/c.min30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and (b.yclose-c.min60)/c.min60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and (b.yclose-c.min90)/c.min90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and (b.yclose-c.min120)/c.min120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and (b.yclose-c.min150)/c.min150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and (b.yclose-c.min180)/c.min180*100 >= #{rateM} ]]>
+	  </when>	 
+	  <when test="duration == 250">
+	   <![CDATA[ and (b.yclose-c.min250)/c.min250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and (b.yclose-c.min500)/c.min500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>			 	 
+
+  	<!-- 기간 평균 거래량 대비 M% 이상인 종목 -->
+ 	<select id="volume_uprate_dayN_moreM_sim" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate, 
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate, 
+	 <choose>
+	  <when test="duration == 5">
+		b.volume/c.vavg5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.volume/c.vavg10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.volume/c.vavg20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   b.volume/c.vavg30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.volume/c.vavg60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   b.volume/c.vavg90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.volume/c.vavg120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   b.volume/c.vavg150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   b.volume/c.vavg180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   b.volume/c.vavg250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   b.volume/c.vavg500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date= #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	and b.volume > 10000 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.volume/c.vavg5*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.volume/c.vavg10*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.volume/c.vavg20*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and b.volume/c.vavg30*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.volume/c.vavg60*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and b.volume/c.vavg90*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.volume/c.vavg120*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and b.volume/c.vavg150*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and b.volume/c.vavg180*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and b.volume/c.vavg250*100 >= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and b.volume/c.vavg500*100 >= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+ 
+  	<!-- 기간 평균 거래량 대비 M% 이하인 종목 -->
+ 	<select id="volume_downrate_dayN_lessM_sim" resultType="StockVO">
+select a.date, a.shcode, a.hname, a.total, b.close price, b.volume, (b.volume-b.yvolume)/b.yvolume*100 vol_diff_rate,  
+		a.sales, a.op_profit_rate_y ic_rate, a.dy_rate, a.notice,
+		(b.close-b.yclose)/b.yclose*100 diff_rate,
+		d.date targetdate, d.close targetprice, (d.close-b.close)/b.close*100 tgt_diff_rate, 
+	 <choose>
+	  <when test="duration == 5">
+		b.volume/c.vavg5*100 rate1
+	  </when>
+	  <when test="duration == 10">
+	   b.volume/c.vavg10*100 rate1
+	  </when>
+	  <when test="duration == 20">
+	   b.volume/c.vavg20*100 rate1
+	  </when>
+	  <when test="duration == 30">
+	   b.volume/c.vavg30*100 rate1
+	  </when>
+	  <when test="duration == 60">
+	   b.volume/c.vavg60*100 rate1
+	  </when>
+	  <when test="duration == 90">
+	   b.volume/c.vavg90*100 rate1
+	  </when>
+	  <when test="duration == 120">
+	   b.volume/c.vavg120*100 rate1
+	  </when>
+	  <when test="duration == 150">
+	   b.volume/c.vavg150*100 rate1
+	  </when>
+	  <when test="duration == 180">
+	   b.volume/c.vavg180*100 rate1
+	  </when>
+	  <when test="duration == 250">
+	   b.volume/c.vavg250*100 rate1
+	  </when>
+	  <when test="duration == 500">
+	   b.volume/c.vavg500*100 rate1
+	  </when>
+	 </choose>
+from
+ (select * from ssummary where date = #{basedate}) a,
+ (select * from dchart where date = #{basedate}) b,
+ (select * from dprice where date= #{basedate}) c,
+ (select * from dchart where date = #{targetdate}) d
+where a.shcode = b.shcode and b.shcode = c.shcode and c.shcode = d.shcode 
+	nd b.volume > 10000 
+
+	<choose>
+	  <when test="duration == 5">
+	   <![CDATA[ and b.volume/c.vavg5*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 10">
+	   <![CDATA[ and b.volume/c.vavg10*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 20">
+	   <![CDATA[ and b.volume/c.vavg20*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 30">
+	   <![CDATA[ and b.volume/c.vavg30*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 60">
+	   <![CDATA[ and b.volume/c.vavg60*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 90">
+	   <![CDATA[ and b.volume/c.vavg90*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 120">
+	   <![CDATA[ and b.volume/c.vavg120*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 150">
+	   <![CDATA[ and b.volume/c.vavg150*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 180">
+	   <![CDATA[ and b.volume/c.vavg180*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 250">
+	   <![CDATA[ and b.volume/c.vavg250*100 <= #{rateM} ]]>
+	  </when>
+	  <when test="duration == 500">
+	   <![CDATA[ and b.volume/c.vavg500*100 <= #{rateM} ]]>
+	  </when>
+	 </choose>
+ 	</select>
+
+ 	 					
+ </mapper>

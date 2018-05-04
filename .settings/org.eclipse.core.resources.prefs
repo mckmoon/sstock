@@ -1,0 +1,9 @@
+eclipse.preferences.version=1
+encoding//src/main/java/com/oldtom/smartstock/board/BoardController.java=UTF-8
+encoding//src/main/java/com/oldtom/smartstock/board/BoardGroupController.java=UTF-8
+encoding//src/main/java/com/oldtom/smartstock/common/FileDownload.java=UTF-8
+encoding//src/main/webapp/WEB-INF/views/include/footer.jsp=UTF-8
+encoding//src/main/webapp/WEB-INF/views/include/header.jsp=UTF-8
+encoding//src/main/webapp/WEB-INF/views/login.jsp=UTF-8
+encoding//src/main/webapp/resources/js/api/typehead_stock.json=UTF-8
+encoding/<project>=UTF-8

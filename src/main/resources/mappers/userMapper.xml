@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+ "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ 
+ <mapper namespace="com.oldtom.smartstock.mapper.UserMapper">
+  	
+ 	<select id="getUserByUsername" resultType="com.oldtom.smartstock.account.model.UserVO">
+ 	select id, username, password, name, nickname, replace(birth_date, '-', '') birth_date, phone_no, address, email_conf, reg_date 
+ 	from user 
+ 	where username = #{username}
+ 	</select>
+
+ 	<select id="getUserById" resultType="com.oldtom.smartstock.account.model.UserVO">
+ 	select id, username, name, nickname, replace(birth_date, '-', '') birth_date, phone_no, address, email_conf, reg_date
+ 	from user 
+ 	where id = #{id}
+ 	</select>
+ 		
+  	<insert id="createUser">
+ 	insert into user (username, password, name, nickname, birth_date, phone_no, address, reg_date)
+ 	values (#{username}, #{password}, #{name}, #{nickname}, #{birth_date}, #{phone_no}, #{address}, now())
+ 	</insert>
+ 
+   	<insert id="createRole">
+ 	insert into user_role (user_id, role_id, expire_date)
+ 	values (#{user_id}, #{role_id}, #{expire_date})
+ 	on duplicate key update
+    expire_date=#{expire_date}
+ 	</insert>
+ 	
+  	<update id="updateUser">
+ 	update user set name = #{name}, nickname = #{nickname}, birth_date = #{birth_date}, 
+ 					phone_no = #{phone_no}, address = #{address}
+ 	where username = #{username}
+ 	</update>
+ 	 	
+  	<update id="updatePassword">
+ 	update user set password = #{password}
+ 	where username = #{username}
+ 	</update>
+ 	 
+   	<update id="confirmEmail">
+ 	update user set email_conf = 'y'
+ 	where username = #{username}
+ 	</update>
+ 	
+   	<update id="updateRole">
+ 	update user_role set expire_date = #{expire_date}
+ 	where user_id = #{user_id} and role_id = #{role_id}
+ 	</update>
+ 		
+ 	<delete id="deleteUser">
+ 	delete from user where username = #{username}
+ 	</delete>
+
+ 	<delete id="deleteRole">
+ 	delete from user_role where user_id = #{user_id}
+ 	</delete>
+ 	
+ 	<select id="getRoles" resultType="com.oldtom.smartstock.account.model.RoleVO">
+ 	<![CDATA[
+	select b.name
+	from user a, role b, user_role c
+	where a.username=#{username} and a.id = c.user_id and c.role_id = b.id and now() < c.expire_date
+ 	]]>
+ 	</select>
+
+ 	<select id="getUserRoles" resultType="com.oldtom.smartstock.account.model.UserroleVO">
+ 	<![CDATA[
+	select SUBSTRING_INDEX(a.name, '_', -1) role_name, b.*
+	from role a, user_role b
+	where b.user_id = #{id} and a.id = b.role_id and a.id > 1
+ 	]]>
+ 	</select>
+ 	
+ 	<select id="getUserProduct" resultType="com.oldtom.smartstock.product.ProductVO">
+	select a.id, a.name, a.price, a.role_id, a.role_name, #{user_id} user_id,
+		if (b.expire_date is not null and b.expire_date > now(), 
+			date_add(b.expire_date, interval a.months month), date_add(now(), interval a.months month)) expire_date
+	from (select * from product where id = #{id}) a 
+		left join (select user_id, role_id, expire_date from user_role where user_id= #{user_id}) b 
+		on a.role_id = b.role_id;
+ 	</select>
+
+ 	
+    <sql id="includeUser">
+
+         <if test="searchKeyword!=null and searchKeyword!='' and searchType!=''">
+         	 
+              <foreach item="item" index="index" collection="searchTypeArr" separator=" OR " open="WHERE (" close=")">
+                     ${item} LIKE CONCAT('%', #{searchKeyword},'%' )
+              </foreach>
+        </if>               
+    </sql>
+
+    <select id="selectUserCount" resultType="Integer" parameterType="com.oldtom.smartstock.common.SearchVO">
+        SELECT COUNT(*)
+          FROM USER
+         <include refid="includeUser"/>
+    </select> 
+    
+    <select id="selectUserList" resultType="com.oldtom.smartstock.account.model.UserVO" parameterType="com.oldtom.smartstock.common.SearchVO">
+        SELECT *
+          FROM USER TB
+         <include refid="includeUser"/>
+         ORDER BY ID DESC 
+         LIMIT ${rowStart-1}, 10
+    </select> 				 		
+ </mapper>
