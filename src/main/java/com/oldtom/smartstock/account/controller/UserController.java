@@ -1,5 +1,6 @@
 package com.oldtom.smartstock.account.controller;
 
+import com.oldtom.smartstock.account.model.InqueryVO;
 import com.oldtom.smartstock.account.model.LoginUser;
 import com.oldtom.smartstock.account.model.UserVO;
 import com.oldtom.smartstock.account.model.UserroleVO;
@@ -84,7 +85,7 @@ public class UserController {
             return "registration";
         }
 
-        // Á¤»óÀûÀÎ ¸ŞÀÏ °èÁ¤ÀÎÁö Å×½ºÆ®
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½×½ï¿½Æ®
         userValidator.validateEmail(userForm.getUsername(), bindingResult);
 
         if (bindingResult.hasErrors()) {
@@ -156,7 +157,7 @@ public class UserController {
 	 	LoginUser loginUser = (LoginUser) auth.getPrincipal(); 
  		logger.debug("Email Confirm? " + loginUser.getEmail_conf());
 	 	if (loginUser.getEmail_conf().equals("n")) {
-	 		//req.getRequestDispatcher("/WEB-INF/views/welcome.jsp").forward(req, res);
+
 	 		model.addAttribute("email", loginUser.getUsername());
 	 		return "welcome";
 	 	}
@@ -182,9 +183,10 @@ public class UserController {
     				= new MimeMessageHelper(message, true, "UTF-8");
     		
     		messageHelper.setFrom(email);
-    		messageHelper.setSubject("StockDB [ÀÌ¸ŞÀÏ ÀÎÁõ] : È®ÀÎÇØÁÖ¼¼¿ä.");
-    		messageHelper.setText("StockDB °¡ÀÔ ÀÎÁõ ÀÌ¸ŞÀÏÀÔ´Ï´Ù."
-    				+"ÀÎÁõ¹øÈ£ : "+code+"\n °¨»çÇÕ´Ï´Ù.");
+    		messageHelper.setSubject("StockDB [ì¤‘ìš”] : ì´ë©”ì¼ ì¸ì¦");
+    		messageHelper.setText("StockDB ì—ì„œ ë°œìƒí•œ ì´ë©”ì¼ ì¸ì¦ ì½”ë“œì…ë‹ˆë‹¤.\n\n"
+    				+ "ì¸ì¦ì½”ë“œ : "+code
+    				+ "\n\n ê°ì‚¬í•©ë‹ˆë‹¤.");
     		messageHelper.setTo(email);
     			
     		mailSender.send(message);
@@ -235,14 +237,15 @@ public class UserController {
     				= new MimeMessageHelper(message, true, "UTF-8");
     		
     		messageHelper.setFrom(email);
-    		messageHelper.setSubject("StockDB [ÀÓ½Ã ¾ÏÈ£] : È®ÀÎÇØÁÖ¼¼¿ä.");
-    		messageHelper.setText("¾È³çÇÏ¼¼¿ä, °í°´´Ô! \n" + "StockDB ÀÓ½Ã ¾ÏÈ£ ¾È³» ÀÌ¸ŞÀÏÀÔ´Ï´Ù." + "\n\n·Î±äÈÄ ¹İµå½Ã ¾ÏÈ£¸¦ º¯°æÇØ ÁÖ¼¼¿ä \n"
-    				+"ÀÓ½Ã ¾ÏÈ£ : "+code);
+    		messageHelper.setSubject("StockDB [ì¤‘ìš”] : ì•”í˜¸ë³€ê²½");
+    		messageHelper.setText("ì•ˆë…•í•˜ì„¸ìš”, ê³ ê°ë‹˜! \n" + "StockDB ê´€ë¦¬ìì…ë‹ˆë‹¤.\n\n" 
+    				+ "ê³ ê°ë‹˜ì˜ ì„ì‹œ ë¹„ë°€ë²ˆí˜¸ê°€ ì•„ë˜ì™€ ë°œê¸‰ë˜ì—ˆìŠµë‹ˆë‹¤.\n ë¡œê¸´í›„ ë°˜ë“œì‹œ ë¹„ë°€ë²ˆí˜¸ë¥¼ ì¬ì„¤ì •í•´ì£¼ì‹œê¸° ë°”ëë‹ˆë‹¤."
+    				+"ì„ì‹œë¹„ë²ˆ : "+code);
     		messageHelper.setTo(email);
     			
     		mailSender.send(message);
     		
-    		user.setPassword(code);   		// ÀÓ½Ã ºñ¹Ğ¹øÈ£
+    		user.setPassword(code);   		// ï¿½Ó½ï¿½ ï¿½ï¿½Ğ¹ï¿½È£
     		userService.updatePassword(user);
 
     	} catch(Exception e) {
@@ -305,7 +308,7 @@ public class UserController {
         return result;
     }
     
-    // °¡°İ »óÇ°À» ±¸ÀÔÇÏ¸é ÇØ´ç ROLEÀÇ À¯È¿ ±â°£À» ÇØ´ç »óÇ°¸¸Å­ ¿¬ÀåÇØÁØ´Ù.
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½Ø´ï¿½ ROLEï¿½ï¿½ ï¿½ï¿½È¿ ï¿½â°£ï¿½ï¿½ ï¿½Ø´ï¿½ ï¿½ï¿½Ç°ï¿½ï¿½Å­ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø´ï¿½.
     @RequestMapping(value = "/buyProduct", method = {RequestMethod.GET, RequestMethod.POST})
     public @ResponseBody String createRole(@RequestParam("pid") String pid) {
     	
@@ -318,18 +321,18 @@ public class UserController {
     	product.setId(pid);
     	product.setUser_id(loginUser.getId());   
     	
-    	// ±¸ÀÔÇÑ »óÇ°¿¡ ´ëÇÑ À¯È¿ ±â°£À» °¡Á®¿Â´Ù.
+    	// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¿ ï¿½â°£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Â´ï¿½.
     	ProductVO uproduct = userService.getUserProduct(product);    	
     	
     	try {
-    		// °¡°İ ÇÃ·£¿¡ ¸Â°Ô ROLE »ı¼º
+    		// ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½Â°ï¿½ ROLE ï¿½ï¿½ï¿½ï¿½
     		UserroleVO urole = new UserroleVO();
     		urole.setUser_id(loginUser.getId());
     		urole.setRole_id(uproduct.getRole_id());					
     		urole.setExpire_date(uproduct.getExpire_date());
     		userService.createRole(urole);
     		
-    		// Ãß°¡µÈ ROLEÀ» ·Î±ä Á¤º¸¿¡ Àç¼³Á¤ 
+    		// ï¿½ß°ï¿½ï¿½ï¿½ ROLEï¿½ï¿½ ï¿½Î±ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ç¼³ï¿½ï¿½ 
     		Set<GrantedAuthority> updatedAuthorities = new HashSet<>(auth.getAuthorities());
     		updatedAuthorities.add(new SimpleGrantedAuthority(uproduct.getRole_name()));
     		Authentication newAuth = new UsernamePasswordAuthenticationToken(auth.getPrincipal(), auth.getCredentials(), updatedAuthorities);
@@ -343,4 +346,17 @@ public class UserController {
         return result;
     }
 
+    @RequestMapping(value = "/contact", method = {RequestMethod.GET, RequestMethod.POST})
+    public @ResponseBody String contract(@RequestParam("name") String name, @RequestParam("email") String email,
+    		@RequestParam("content") String content) {
+
+    	logger.debug(email + ":" + email + ":" + content );
+    	InqueryVO inquery = new InqueryVO();
+    	inquery.setName(name);
+    	inquery.setEmail(email);
+    	inquery.setContent(content);
+    	
+	    userService.createInquery(inquery);
+        return "0";
+    }
 }

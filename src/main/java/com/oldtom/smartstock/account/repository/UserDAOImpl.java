@@ -7,6 +7,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.oldtom.smartstock.account.model.InqueryVO;
 import com.oldtom.smartstock.account.model.RoleVO;
 import com.oldtom.smartstock.account.model.UserVO;
 import com.oldtom.smartstock.account.model.UserroleVO;
@@ -113,6 +114,36 @@ public class UserDAOImpl implements UserDAO {
 		// TODO Auto-generated method stub
 		//user.setPassword(encoder.encodePassword(user.getPassword(), null));
 		session.update(namespace+".updatePassword", user);
+	}
+
+	@Override
+	public void createInquery(InqueryVO inquery) {
+		// TODO Auto-generated method stub
+		session.insert(namespace+".createInquery", inquery);
+	}
+
+	@Override
+	public InqueryVO getInquery(long id) {
+		// TODO Auto-generated method stub
+		return session.selectOne(namespace + ".getInquery", id);
+	}
+
+	@Override
+	public void deleteInquery(long id) {
+		// TODO Auto-generated method stub
+		session.delete(namespace+".deleteInquery", id);
+	}
+
+	@Override
+	public List<InqueryVO> getInqueryList(SearchVO param) {
+		// TODO Auto-generated method stub
+		return session.selectList("selectInqueryList", param);
+	}
+
+	@Override
+	public Integer getInqueryCount(SearchVO param) {
+		// TODO Auto-generated method stub
+		return session.selectOne("selectInqueryCount", param);
 	}
 
 

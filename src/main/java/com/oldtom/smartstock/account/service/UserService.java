@@ -2,6 +2,7 @@ package com.oldtom.smartstock.account.service;
 
 import java.util.List;
 
+import com.oldtom.smartstock.account.model.InqueryVO;
 import com.oldtom.smartstock.account.model.LoginUser;
 import com.oldtom.smartstock.account.model.UserVO;
 import com.oldtom.smartstock.account.model.UserroleVO;
@@ -33,4 +34,16 @@ public interface UserService {
     public Integer 		getUserCount(SearchVO param);
     
     public List<UserVO> getUserList(SearchVO param);
+
+    public void createInquery(InqueryVO inquery);
+    
+    public InqueryVO getInquery(long id);
+    
+    public void deleteInquery(long id);
+    
+    public List<InqueryVO>	getInqueryList(SearchVO param);
+    
+    public Integer	getInqueryCount(SearchVO param);
+
+
 }

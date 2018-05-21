@@ -423,16 +423,16 @@
     <div class="col-sm-7 slideanim">
       <div class="row">
         <div class="col-sm-6 form-group">
-          <input class="form-control" id="name" name="name" placeholder="Name" type="text" required>
+          <input class="form-control" id="cust_name" name="cust_name" placeholder="Name" type="text" required>
         </div>
         <div class="col-sm-6 form-group">
-          <input class="form-control" id="email" name="email" placeholder="Email" type="email" required>
+          <input class="form-control" id="cust_email" name="cust_email" placeholder="Email" type="email" required>
         </div>
       </div>
-      <textarea class="form-control" id="comments" name="comments" placeholder="Comment" rows="5"></textarea><br>
+      <textarea class="form-control" id="cust_content" name="cust_content" placeholder="Comment" rows="5"></textarea><br>
       <div class="row">
         <div class="col-sm-12 form-group">
-          <button class="btn btn-default pull-right" type="submit">Send</button>
+          <input class="btn btn-default pull-right" type="button" id="contact_submit" value="Send">
         </div>
       </div>
     </div>
@@ -484,6 +484,31 @@ $(document).ready(function(){
 })
 </script>
 
+<script>
+	var cust_name = $("input[name=cust_name]");
+	var cust_email = $("input[name=cust_email]");
+	var cust_content = $("#cust_content");
+	
+	$("#contact_submit").click(function(){
+		alert(cust_content.val());
+		
+		$.ajax({
+			type: 'POST',
+			url: '${contextPath}/contact',
+			data: {
+				"name" : $(cust_name).val(),
+				"email" : $(cust_email).val(),
+				"content" : $(cust_content).val()
+			},
+			success: function(data){
+				if(data=='0'){
+					alert("내용이 관리자에게 전달되었습니다. 연락드리겠습니다. 감사합니다.");
+				}
+			}
+		});//end ajax 
+	});
+	
+</script>
 </body>
 
 </html>

@@ -2,6 +2,7 @@ package com.oldtom.smartstock.account.repository;
 
 import java.util.List;
 
+import com.oldtom.smartstock.account.model.InqueryVO;
 import com.oldtom.smartstock.account.model.RoleVO;
 import com.oldtom.smartstock.account.model.UserVO;
 import com.oldtom.smartstock.account.model.UserroleVO;
@@ -36,4 +37,17 @@ public interface UserDAO {
     public Integer 		selectUserCount(SearchVO param);
     
     public List<UserVO> selectUserList(SearchVO param);
+    
+
+    
+    public void createInquery(InqueryVO inquery);
+    
+    public InqueryVO getInquery(long id);
+    
+    public void deleteInquery(long id);
+    
+    public List<InqueryVO>	getInqueryList(SearchVO param);
+    
+    public Integer	getInqueryCount(SearchVO param);
+    
 }

@@ -105,5 +105,36 @@
          <include refid="includeUser"/>
          ORDER BY ID DESC 
          LIMIT ${rowStart-1}, 10
-    </select> 				 		
+    </select> 	
+    
+    <insert id="createInquery">
+ 	insert into user_inquery (name, email, content, reg_date)
+ 	values (#{name}, #{email}, #{content}, now())
+ 	</insert>			 		
+
+    <select id="selectInqueryCount" resultType="Integer" parameterType="com.oldtom.smartstock.common.SearchVO">
+        SELECT COUNT(*)
+          FROM USER_INQUERY
+         <include refid="includeUser"/>
+    </select> 
+    
+    <select id="selectInqueryList" resultType="com.oldtom.smartstock.account.model.InqueryVO" parameterType="com.oldtom.smartstock.common.SearchVO">
+        SELECT *
+          FROM USER_INQUERY TB
+         <include refid="includeUser"/>
+         ORDER BY ID DESC 
+         LIMIT ${rowStart-1}, 10
+    </select>  
+ 
+  	<delete id="deleteInquery">
+ 	delete from user_inquery where id = #{id}
+ 	</delete>
+ 
+  	<select id="getInquery" resultType="com.oldtom.smartstock.account.model.InqueryVO">
+ 	select *
+ 	from user_inquery
+ 	where id = #{id}
+ 	</select>
+ 
+ 
  </mapper>

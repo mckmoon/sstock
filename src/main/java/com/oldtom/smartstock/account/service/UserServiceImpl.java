@@ -1,5 +1,6 @@
 package com.oldtom.smartstock.account.service;
 
+import com.oldtom.smartstock.account.model.InqueryVO;
 import com.oldtom.smartstock.account.model.LoginUser;
 import com.oldtom.smartstock.account.model.UserVO;
 import com.oldtom.smartstock.account.model.UserroleVO;
@@ -55,7 +56,7 @@ public class UserServiceImpl implements UserService {
 	public void updateUser(UserVO user) {
 		// TODO Auto-generated method stub
 		// user.setPassword(bCryptPasswordEncoder.encode(user.getPassword())); 
-		// ºñ¹Ð¹øÈ£´Â º°µµ·Î °»½ÅÇÑ´Ù.
+		// ï¿½ï¿½Ð¹ï¿½È£ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ñ´ï¿½.
         userRepository.updateUser(user);		
 	}
 
@@ -113,6 +114,36 @@ public class UserServiceImpl implements UserService {
 	public ProductVO getUserProduct(ProductVO product) {
 		// TODO Auto-generated method stub
 		return userRepository.getUserProduct(product);
+	}
+
+	@Override
+	public void createInquery(InqueryVO inquery) {
+		// TODO Auto-generated method stub
+		userRepository.createInquery(inquery);
+	}
+
+	@Override
+	public InqueryVO getInquery(long id) {
+		// TODO Auto-generated method stub
+		return userRepository.getInquery(id);
+	}
+
+	@Override
+	public void deleteInquery(long id) {
+		// TODO Auto-generated method stub
+		userRepository.deleteInquery(id);
+	}
+
+	@Override
+	public List<InqueryVO> getInqueryList(SearchVO param) {
+		// TODO Auto-generated method stub
+		return userRepository.getInqueryList(param);
+	}
+
+	@Override
+	public Integer getInqueryCount(SearchVO param) {
+		// TODO Auto-generated method stub
+		return userRepository.getInqueryCount(param);
 	}
 
 
