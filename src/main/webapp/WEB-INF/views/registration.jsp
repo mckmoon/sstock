@@ -23,6 +23,16 @@
 
 <body class="gray-bg">
 
+<!-- Modal -->
+<div id="dialog_modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-body">               
+            </div>            	
+        </div>
+    </div>
+</div>
+
 <div class="middle-box text-center loginscreen   animated fadeInDown">
   <div>
 	<div>
@@ -89,7 +99,9 @@
 			<div class="form-group ${status.error ? 'has-error' : ''}">
                 <div class="checkbox i-checks">
                 	<form:checkbox path="contractAgreement" label="약관에 동의합니다" autofocus="true"></form:checkbox>
+                	<a data-toggle="modal" href="${contextPath}/terms" data-target="#dialog_modal">약관상세</a>
                 </div> 
+                
 					<form:errors path="contractAgreement"></form:errors>                              	
             </div>
         </spring:bind>
@@ -114,7 +126,17 @@
                 radioClass: 'iradio_square-green',
             });
         });
+        
+    	$("#dialog_modal").on("shown.bs.modal",function(){
+ 		   //will be executed everytime #item_modal is shown
+ 		   $(this).hide().show(); //hide first and then show here
+	 	});
+	 		
+	 	$("body").on('hidden.bs.modal', '.modal', function () {
+	 		  $(this).removeData('bs.modal');
+	 	});
     </script>
     
 </body>
 </html>
+

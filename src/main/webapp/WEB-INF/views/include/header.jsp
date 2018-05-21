@@ -250,6 +250,7 @@
                        <li><a href="${contextPath}/admin/boardGroupList">게시판 관리</a></li>
                        <li><a href="${contextPath}/admin/UserList">회원 관리</a></li>
                        <li><a href="${contextPath}/admin/ProductList">상품 관리</a></li>
+                       <li><a href="${contextPath}/admin/InqueryList">고객문의 관리</a></li>
                        <li><a href="">Menu item</a></li>
                 </ul>
             </li>            

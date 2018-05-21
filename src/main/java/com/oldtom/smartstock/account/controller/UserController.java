@@ -102,6 +102,11 @@ public class UserController {
         return "welcome";
     }
 
+    @RequestMapping(value = "/terms", method = RequestMethod.GET)
+    public String terms(Model model) {
+        return "terms";
+    }
+    
     @RequestMapping(value = "/welcome", method = RequestMethod.GET)
     public String welcome(Model model, Authentication auth) {
     	//LoginUser loginUser = (LoginUser) auth.getPrincipal();

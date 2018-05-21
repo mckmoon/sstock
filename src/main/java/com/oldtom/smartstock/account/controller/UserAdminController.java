@@ -74,19 +74,19 @@ public class UserAdminController {
     }
     
     /**
-     * È¸¿ø Á¤º¸ ÀúÀå.
+     * È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
      */
     @RequestMapping(value = "/userSave")
     public String userSave(HttpServletRequest request, UserVO user) {
 
     	userService.updateUser(user);
 
-        //redirect½Ã¿¡´Â ÇöÀçÀ§Ä¡¸¦ ±âÁØÀ¸·Î...
+        //redirectì‹œì—ëŠ” í˜„ì¬ìœ„ì¹˜ë¥¼ ê¸°ì¤€ìœ¼ë¡œ...
         return "redirect:userList";
     }
     
     /**
-     * ±ÇÇÑ Á¤º¸ ÀúÀå.
+     * ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
      */
     @RequestMapping(value = "/roleSave")
     public String roleSave(HttpServletRequest request, UserroleVO urole) {
@@ -94,7 +94,7 @@ public class UserAdminController {
     	userService.createRole(urole);
 
     	request.setAttribute("id", id);
-        //redirect½Ã¿¡´Â ÇöÀçÀ§Ä¡¸¦ ±âÁØÀ¸·Î...
+        //redirectì‹œì—ëŠ” í˜„ì¬ìœ„ì¹˜ë¥¼ ê¸°ì¤€ìœ¼ë¡œ...
         return "redirect:userForm?id="+id;
     }
     
@@ -110,9 +110,9 @@ public class UserAdminController {
     				= new MimeMessageHelper(message, true, "UTF-8");
     		
     		messageHelper.setFrom(email);
-    		messageHelper.setSubject("StockDB [ÀÌ¸ŞÀÏ ÀÎÁõ] : È®ÀÎÇØÁÖ¼¼¿ä.");
-    		messageHelper.setText("StockDB °¡ÀÔ ÀÎÁõ ÀÌ¸ŞÀÏÀÔ´Ï´Ù."
-    				+"ÀÎÁõ¹øÈ£ : "+code+"\n °¨»çÇÕ´Ï´Ù.");
+    		messageHelper.setSubject("StockDB [ï¿½Ì¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½] : È®ï¿½ï¿½ï¿½ï¿½ï¿½Ö¼ï¿½ï¿½ï¿½.");
+    		messageHelper.setText("StockDB ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½Ô´Ï´ï¿½."
+    				+"ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½È£ : "+code+"\n ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.");
     		messageHelper.setTo(email);
     			
     		mailSender.send(message);
