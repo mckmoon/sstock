@@ -167,6 +167,7 @@ public class UserController {
 	 		return "welcome";
 	 	}
 	 	
+	 	/*
 	    AccessDeniedException ade = (AccessDeniedException) req.getAttribute(WebAttributes.ACCESS_DENIED_403);
 	    logger.info("exception : {}",ade);
 	    //model.addAttribute("auth", auth);
@@ -174,7 +175,10 @@ public class UserController {
 	    model.addAttribute("product_blue", productService.getProductListByRole("2"));
 	    model.addAttribute("product_silver", productService.getProductListByRole("3"));
 	    model.addAttribute("product_gold", productService.getProductListByRole("4"));
-	    return "denied";
+	    return "/board/productList";
+	    */
+	 	//model.addAttribute("denied", "yes");
+	 	return "redirect:/product/productList?denied=yes";
     } 
 
     @RequestMapping(value="/authEmail", method=RequestMethod.POST)

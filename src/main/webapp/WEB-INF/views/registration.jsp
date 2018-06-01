@@ -110,7 +110,7 @@
         <p class="text-muted text-center"><small>이미 회원이십니까?</small></p>
                 <a class="btn btn-sm btn-white btn-block" href="${contextPath}/login">로그인</a>
     </form:form>
-    <p class="m-t"> <small>EagleLoe Company &copy; 2017</small> </p>
+    <p class="m-t"> <small>EagleLeo Financial Technology &copy; 2018</small> </p>
   </div>
 </div>
 

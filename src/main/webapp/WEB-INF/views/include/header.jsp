@@ -240,7 +240,7 @@
                 <ul class="nav nav-second-level collapse">
                        <li><a href="${contextPath}/board/boardList?bgno=1">공지사항</a></li>
                        <li><a href="${contextPath}/board/boardList?bgno=2">질문/응답</a></li>
-                       <li><a href="">Menu item</a></li>
+                       <li><a href="${contextPath}/product/productList?denied=no">상품 구매</a></li>
                        <li><a href="">Menu item</a></li>
                 </ul>
             </li>

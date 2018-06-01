@@ -22,7 +22,7 @@ public class ProductService {
     private DataSourceTransactionManager txManager;
     
     private static String namespace = "com.oldtom.smartstock.mapper.ProductMapper";
-    private static final Logger logger = LoggerFactory.getLogger(ProductController.class);
+    private static final Logger logger = LoggerFactory.getLogger(ProductService.class);
     
     public void createProduct(ProductVO product) {
     	session.insert(namespace+".createProduct", product);

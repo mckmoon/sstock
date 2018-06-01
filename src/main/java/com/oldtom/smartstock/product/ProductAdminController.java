@@ -30,9 +30,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 @Controller
 @RequestMapping("/admin/")
-public class ProductController {
+public class ProductAdminController {
 	
-	private static final Logger logger = LoggerFactory.getLogger(ProductController.class);
+	private static final Logger logger = LoggerFactory.getLogger(ProductAdminController.class);
 	
     @Autowired
     private ProductService service;
@@ -64,13 +64,13 @@ public class ProductController {
             model.addAttribute("product", product);
         }
         else {
-        	model.addAttribute("id", "0");		// ½Å±Ô »óÇ° µî·Ï
+        	model.addAttribute("id", "0");		// ï¿½Å±ï¿½ ï¿½ï¿½Ç° ï¿½ï¿½ï¿½
         }
         return "admin/ProductForm";
     }
     
     /**
-     * »óÇ° Á¤º¸ ÀúÀå.
+     * ï¿½ï¿½Ç° ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
      */
     @RequestMapping(value = "/ProductSave")
     public String productSave(HttpServletRequest request, ProductVO product) {
@@ -80,19 +80,19 @@ public class ProductController {
     		service.updateProduct(product);
     	}
 
-        //redirect½Ã¿¡´Â ÇöÀçÀ§Ä¡¸¦ ±âÁØÀ¸·Î...
+        //redirectï¿½Ã¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½...
         return "redirect:ProductList";
     }
     
     /**
-     * »óÇ° Á¤º¸ »èÁ¦.
+     * ï¿½ï¿½Ç° ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½.
      */
     @RequestMapping(value = "/ProductDelete")
     public String productDelete(HttpServletRequest request, ProductVO product) {
 
     	service.deleteProduct(product.getId());
 
-        //redirect½Ã¿¡´Â ÇöÀçÀ§Ä¡¸¦ ±âÁØÀ¸·Î...
+        //redirectï¿½Ã¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½...
         return "redirect:ProductList";
     }
 }

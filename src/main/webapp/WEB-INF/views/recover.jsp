@@ -44,7 +44,7 @@
         <h4 class="text-muted text-center"><a href="${contextPath}/">메인페이지</a></h4>
 		</div>
 
-    <p class="m-t"> <small>EagleLoe Company &copy; 2017</small> </p>
+    <p class="m-t"> <small>EagleLeo Financial Technology &copy; 2017</small> </p>
   </div>
 </div>
 
