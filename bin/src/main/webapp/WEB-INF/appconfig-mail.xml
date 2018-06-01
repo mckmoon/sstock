@@ -1,0 +1,31 @@
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns="http://www.springframework.org/schema/beans"
+       xsi:schemaLocation="http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd http://www.springframework.org/schema/beans
+ http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+<!-- mimeMessage와 mimeMessageHelper를 사용할 때 필요한 mailSender 객체이다.
+	@AutoWired 로 di한다.-->
+	<bean id="mailSender"
+	      class="org.springframework.mail.javamail.JavaMailSenderImpl">
+	   <property name="host" value="${ms.host}" />
+	   <!-- SMTP 서버주소: smtp.gmail.com(보내는 메일이 gmail 계정일 경우) -->
+	   <property name="port" value="${ms.port}" />
+	   <!-- 구글의 SMTP 서버포트: 587을 사용했고 465, 25번도 있다. -->
+	   <property name="username" value="${ms.username}" />
+	   <!-- 사용자 아이디: 아이디@계정포함 -->
+	   <property name="password" value="${ms.password}" /> <!-- 사용자 비밀번호 -->
+	   <property name="defaultEncoding" value="UTF-8"/> <!-- 인코딩 방식 -->
+	  
+	   <property name="javaMailProperties"> 
+	      <props>
+	         <prop key="mail.transport.protocol">smtp</prop> <!--메일서버프로토콜-->
+	         <prop key="mail.smtp.auth">true</prop> <!-- 인증여부  -->
+	         <prop key="mail.smtp.starttls.enable">true</prop>
+	         <prop key="mail.debug">true</prop>
+	      </props>
+	   </property>
+	</bean>
+
+    
+</beans>
